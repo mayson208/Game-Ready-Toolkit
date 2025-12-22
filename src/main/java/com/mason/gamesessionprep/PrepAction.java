@@ -4,12 +4,12 @@ public class PrepAction {
 
     private final String name;
     private final String description;
-    private final boolean enabled;
+    private boolean selected;
 
-    public PrepAction(String name, String description, boolean enabled) {
+    public PrepAction(String name, String description) {
         this.name = name;
         this.description = description;
-        this.enabled = enabled;
+        this.selected = true;
     }
 
     public String getName() {
@@ -20,7 +20,11 @@ public class PrepAction {
         return description;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    public boolean isSelected() {
+        return selected;
+    }
+
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 }
