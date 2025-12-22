@@ -3,14 +3,13 @@ package com.mason.gamesessionprep;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class GameSessionPrepApp extends Application {
 
@@ -73,14 +72,7 @@ public class GameSessionPrepApp extends Application {
         Button runButton = new Button("Prepare System");
         Button exitButton = new Button("Exit");
 
-        runButton.setOnAction(event -> {
-            long selectedCount = actions.stream()
-                    .filter(PrepAction::isSelected)
-                    .count();
-
-            statusLabel.setText("Prepared " + selectedCount + " action(s)");
-        });
-
+        runButton.setOnAction(event -> showPreview(stage, statusLabel));
         exitButton.setOnAction(event -> stage.close());
 
         VBox root = new VBox(
@@ -98,10 +90,46 @@ public class GameSessionPrepApp extends Application {
         titleLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: white;");
         statusLabel.setStyle("-fx-text-fill: #bbbbbb;");
 
-        Scene scene = new Scene(root, 440, 420);
+        Scene scene = new Scene(root, 460, 460);
         stage.setTitle("Game Ready Toolkit");
         stage.setScene(scene);
         stage.show();
+    }
+
+    private void showPreview(Stage owner, Label statusLabel) {
+
+        List<PrepAction> selectedActions = actions.stream()
+                .filter(PrepAction::isSelected)
+                .collect(Collectors.toList());
+
+        if (selectedActions.isEmpty()) {
+            statusLabel.setText("No actions selected");
+            return;
+        }
+
+        Alert preview = new Alert(Alert.AlertType.CONFIRMATION);
+        preview.initOwner(owner);
+        preview.setTitle("Preparation Preview");
+        preview.setHeaderText("The following actions are selected");
+
+        String content = selectedActions.stream()
+                .map(PrepAction::getName)
+                .collect(Collectors.joining("\n"));
+
+        preview.setContentText(content);
+
+        ButtonType confirm = new ButtonType("Confirm");
+        ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        preview.getButtonTypes().setAll(confirm, cancel);
+
+        preview.showAndWait().ifPresent(result -> {
+            if (result == confirm) {
+                statusLabel.setText("Preparation complete");
+            } else {
+                statusLabel.setText("Preparation canceled");
+            }
+        });
     }
 
     public static void main(String[] args) {
