@@ -24,17 +24,37 @@ public class GameSessionPrepApp extends Application {
 
         actions.add(new PrepAction(
                 "Enable High Performance Power Plan",
-                "Ensures the system prioritizes performance over power saving"
+                "Prioritize system performance over power savings"
         ));
 
         actions.add(new PrepAction(
                 "Silence Notifications",
-                "Reduces distractions during gameplay"
+                "Reduce distractions during gameplay"
         ));
 
         actions.add(new PrepAction(
                 "Close Background Applications",
-                "Helps free system resources before launching a game"
+                "Free system resources before launching a game"
+        ));
+
+        actions.add(new PrepAction(
+                "Pause Background Updates",
+                "Reduce unexpected CPU or disk usage"
+        ));
+
+        actions.add(new PrepAction(
+                "Clear Temporary Files",
+                "Remove temporary system files created by applications"
+        ));
+
+        actions.add(new PrepAction(
+                "Confirm Audio Device",
+                "Ensure the correct audio output device is active"
+        ));
+
+        actions.add(new PrepAction(
+                "Set Display Focus Mode",
+                "Reduce popups and system interruptions"
         ));
 
         VBox checklistBox = new VBox(8);
@@ -73,15 +93,12 @@ public class GameSessionPrepApp extends Application {
         );
 
         root.setPadding(new Insets(20));
-        root.setStyle(
-                "-fx-background-color: #1e1e1e;" +
-                "-fx-text-fill: white;"
-        );
+        root.setStyle("-fx-background-color: #1e1e1e;");
 
         titleLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: white;");
         statusLabel.setStyle("-fx-text-fill: #bbbbbb;");
 
-        Scene scene = new Scene(root, 420, 320);
+        Scene scene = new Scene(root, 440, 420);
         stage.setTitle("Game Ready Toolkit");
         stage.setScene(scene);
         stage.show();
