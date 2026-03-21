@@ -1,61 +1,43 @@
 # Game Ready Toolkit
 
-Game Ready Toolkit is an AI-assisted JavaFX desktop application I’m building to help prepare a Windows system for a gaming session **before launching a game**.
+A JavaFX desktop app that prepares your Windows PC for gaming with one click — and restores normal settings when you're done.
 
-The focus of this project is on safe, transparent, and user-controlled preparation steps that improve focus and system readiness without interacting with games or anti-cheat systems.
+![Java](https://img.shields.io/badge/Java-21-blue) ![JavaFX](https://img.shields.io/badge/JavaFX-21-orange) ![Maven](https://img.shields.io/badge/Maven-build-red)
 
-This is an actively evolving project and will continue to grow as new features are designed and tested.
+## Features
 
----
+- **Prepare Mode** — select and apply system optimisations before a gaming session:
+  - Enable High Performance power plan
+  - Silence notifications (Focus Assist)
+  - Flush DNS cache
+  - Clear temp files
+  - Pause Windows Update
+  - Check display refresh rate
 
-## Project Goal
+- **Restore Mode** — undo the optimisations after your session:
+  - Restore Balanced power plan
+  - Re-enable notifications
+  - Restart Windows Update
+  - Flush DNS
 
-I wanted to create a tool that acts as a **pre-game assistant**, not a background optimizer.
+- **Persistent checkbox selections** — remembered via Java Preferences across restarts
+- **Preview dialog** before running so you know exactly what will execute
+- **Background threading** with a live progress bar
+- **Per-action results dialog** showing pass/fail and command output for each action
+- **Tooltip descriptions** on every checkbox
 
-Instead of modifying games or running during gameplay, the application:
-- Analyzes basic system state
-- Explains potential preparation steps
-- Lets the user decide what actions to take
-- Exits before the game starts
+## How It Works
 
-Safety and clarity are prioritized over automation.
+Actions run via `ProcessBuilder` and PowerShell. No third-party tools required. All actions are transparent and reversible.
 
----
-
-## Current State
-
-- JavaFX desktop application framework
-- Basic preparation action structure
-- Explicit pre-launch scope
-- Clear separation between analysis and execution
-
----
-
-## Planned Features
-
-- Pre-game preparation checklist
-- Power plan and notification awareness
-- Background application awareness
-- Session readiness summary
-- Dark mode by default
-- AI-assisted explanations and recommendations
-
----
-
-## AI-Assisted Design
-
-AI is used to help generate explanations and recommendations, but all system interactions and safety constraints are explicitly controlled by the application.
-
-The tool does not:
-- Interact with running games
-- Inspect or modify game memory
-- Run persistently in the background
-
----
-
-## Running the Application
+## Running
 
 ```bash
-mvn clean javafx:run
+mvn javafx:run
+```
 
-Hope you Enjoy!  
+## Requirements
+
+- Java 21+
+- Maven 3.9+
+- Windows 10/11
