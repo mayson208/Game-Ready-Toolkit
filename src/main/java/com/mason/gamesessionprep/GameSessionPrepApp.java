@@ -8,6 +8,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 
 import java.awt.AWTException;
@@ -349,6 +352,16 @@ public class GameSessionPrepApp extends Application {
         );
 
         Scene scene = new Scene(root, 530, elevated ? 560 : 610);
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN),
+                () -> setAllSelected(true));
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN),
+                () -> setAllSelected(false));
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN),
+                () -> showPreview(stage, statusLabel, progressBar, runButton, timerLabel));
+
         stage.setTitle("Game Ready Toolkit");
         stage.setMinWidth(420);
         stage.setScene(scene);
