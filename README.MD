@@ -6,35 +6,49 @@ A JavaFX desktop app that prepares your Windows PC for gaming with one click —
 
 ## Features
 
-- **Prepare Mode** — select and apply system optimisations before a gaming session:
-  - Enable High Performance power plan
-  - Silence notifications (Focus Assist)
-  - Flush DNS cache
-  - Clear temp files
-  - Pause Windows Update
-  - Check display refresh rate
+### Prepare Mode
+Select and apply optimisations before a gaming session:
 
-- **Restore Mode** — undo the optimisations after your session:
-  - Restore Balanced power plan
-  - Re-enable notifications
-  - Restart Windows Update
-  - Flush DNS
+| Action | What It Does |
+|--------|-------------|
+| High Performance Power Plan | Maximises CPU/GPU clock speeds |
+| Enable Windows Game Mode | Dedicates more resources to the active game |
+| Set GPU to High Performance | Writes Windows graphics preference to registry |
+| Silence Notifications | Blocks popups via Focus Assist registry key |
+| Stop Xbox Game Bar | Kills overlay process to reduce CPU/GPU overhead |
+| Disable Mouse Acceleration | Raw linear input — recommended for FPS games |
+| Flush DNS Cache | Clears stale DNS for better matchmaking latency |
+| Clear Temp Files | Frees disk space and reduces background I/O |
+| Pause Windows Update | Stops wuauserv from stealing bandwidth |
+| Stop Windows Search Indexer | Pauses disk indexing during gameplay |
+| Pause OneDrive Sync | Frees bandwidth and CPU from background uploads |
+| Check Display Refresh Rate | Reports current and max monitor refresh rate |
 
-- **Persistent checkbox selections** — remembered via Java Preferences across restarts
-- **Preview dialog** before running so you know exactly what will execute
-- **Background threading** with a live progress bar
-- **Per-action results dialog** showing pass/fail and command output for each action
-- **Tooltip descriptions** on every checkbox
+### Restore Mode
+Undo all optimisations after your session — matching restore action for every prepare action.
 
-## How It Works
-
-Actions run via `ProcessBuilder` and PowerShell. No third-party tools required. All actions are transparent and reversible.
+### Quality of Life
+- **Admin warning banner** — orange alert if the app isn't running as Administrator, so you know which actions may fail
+- **Session timer** — live `HH:MM:SS` counter starts after a successful Prepare run
+- **Select All / Deselect All** — bulk-check the entire list in one click
+- **Persistent selections** — checkbox state remembered via Java Preferences across restarts
+- **Preview dialog** — shows exactly what will run before you confirm
+- **Scrollable checklist** — handles any number of actions without overflow
+- **Detailed results dialog** — monospace TextArea with per-action pass/fail and command output
+- **30-second process timeout** — runaway processes are killed automatically
+- **Background threading** — UI stays responsive during execution (JavaFX `Task<>`)
 
 ## Running
 
 ```bash
+# Run directly with Maven
 mvn javafx:run
+
+# Or build a JAR first
+mvn package
 ```
+
+> **Tip:** Right-click and run as Administrator to enable all actions, especially service control and registry writes.
 
 ## Requirements
 

@@ -10,6 +10,13 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -451,6 +458,7 @@ public class GameSessionPrepApp extends Application {
                 stopSessionTimer(timerLabel);
             }
 
+            writeLog(results);
             showResultDialog(results);
 
             if (failed == 0) {
@@ -472,6 +480,35 @@ public class GameSessionPrepApp extends Application {
         Thread t = new Thread(task, "prep-runner");
         t.setDaemon(true);
         t.start();
+    }
+
+    // ── Session log ───────────────────────────────────────────────────────────
+
+    private static final Path LOG_FILE = Paths.get(
+            System.getProperty("user.home"), "GameReadyToolkit-sessions.log");
+
+    private void writeLog(List<PrepActionResult> results) {
+        try {
+            String ts = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            StringBuilder sb = new StringBuilder();
+            sb.append("[").append(ts).append("] ")
+              .append(restoreMode ? "RESTORE" : "PREPARE").append("\n");
+            for (PrepActionResult r : results) {
+                sb.append("  ").append(r.isSuccess() ? "OK" : "FAIL")
+                  .append("  ").append(r.getActionName());
+                String msg = r.getMessage();
+                if (msg != null && !msg.isBlank() && !msg.equals("OK")) {
+                    sb.append(" — ").append(msg.replace("\n", " | "));
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+            Files.writeString(LOG_FILE, sb.toString(),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ignored) {
+            // Log write failures are non-fatal
+        }
     }
 
     // ── Result dialog ─────────────────────────────────────────────────────────
