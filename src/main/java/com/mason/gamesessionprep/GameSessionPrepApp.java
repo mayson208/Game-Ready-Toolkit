@@ -10,7 +10,13 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
+import java.awt.AWTException;
 import java.awt.Desktop;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
+import java.awt.SystemTray;
+import java.awt.TrayIcon;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -347,6 +353,63 @@ public class GameSessionPrepApp extends Application {
         stage.setMinWidth(420);
         stage.setScene(scene);
         stage.show();
+
+        setupTrayIcon(stage);
+    }
+
+    // ── System tray ───────────────────────────────────────────────────────────
+
+    private void setupTrayIcon(Stage stage) {
+        if (!SystemTray.isSupported()) return;
+
+        // Generate a simple 16×16 green icon programmatically
+        BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        g.setColor(new java.awt.Color(0x27, 0xae, 0x60)); // green
+        g.fillOval(1, 1, 14, 14);
+        g.dispose();
+
+        PopupMenu popup = new PopupMenu();
+        MenuItem showItem  = new MenuItem("Show");
+        MenuItem quitItem  = new MenuItem("Quit");
+        popup.add(showItem);
+        popup.addSeparator();
+        popup.add(quitItem);
+
+        TrayIcon trayIcon = new TrayIcon(img, "Game Ready Toolkit", popup);
+        trayIcon.setImageAutoSize(true);
+
+        showItem.addActionListener(e -> Platform.runLater(() -> {
+            stage.show();
+            stage.toFront();
+        }));
+        trayIcon.addActionListener(e -> Platform.runLater(() -> {
+            stage.show();
+            stage.toFront();
+        }));
+        quitItem.addActionListener(e -> {
+            SystemTray.getSystemTray().remove(trayIcon);
+            Platform.exit();
+        });
+
+        // Hide to tray on close instead of exiting
+        Platform.setImplicitExit(false);
+        stage.setOnCloseRequest(e -> {
+            e.consume();
+            stage.hide();
+            trayIcon.displayMessage(
+                "Game Ready Toolkit",
+                "Running in tray — double-click to restore.",
+                TrayIcon.MessageType.INFO);
+        });
+
+        try {
+            SystemTray.getSystemTray().add(trayIcon);
+        } catch (AWTException ignored) {
+            // Tray not available — fall back to normal close behaviour
+            Platform.setImplicitExit(true);
+            stage.setOnCloseRequest(null);
+        }
     }
 
     // ── Checklist helpers ─────────────────────────────────────────────────────
