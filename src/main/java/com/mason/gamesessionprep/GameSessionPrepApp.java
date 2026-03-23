@@ -10,6 +10,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
+import java.awt.Desktop;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -533,12 +534,20 @@ public class GameSessionPrepApp extends Application {
             "-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px; " +
             "-fx-control-inner-background: #1e1e1e; -fx-text-fill: #d0d0d0;");
 
+        ButtonType openLogBtn = new ButtonType("Open Log", ButtonBar.ButtonData.LEFT);
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle(restoreMode ? "Restore Results" : "Preparation Results");
         dialog.setHeaderText("Completed " + results.size() + " action(s)");
         dialog.getDialogPane().setContent(ta);
         dialog.getDialogPane().setPrefWidth(500);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+        dialog.getDialogPane().getButtonTypes().addAll(openLogBtn, ButtonType.OK);
+
+        dialog.resultConverterProperty().set(bt -> {
+            if (bt == openLogBtn && Files.exists(LOG_FILE) && Desktop.isDesktopSupported()) {
+                try { Desktop.getDesktop().open(LOG_FILE.toFile()); } catch (IOException ignored) {}
+            }
+            return null;
+        });
         dialog.showAndWait();
     }
 
