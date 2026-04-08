@@ -244,9 +244,18 @@ public class GameSessionPrepApp extends Application {
         prepActions.clear();
 
         prepActions.add(new PrepAction(
-                "High Performance Power Plan",
-                "Maximize CPU/GPU clocks — biggest single FPS booster",
-                () -> runPowerShell("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c")
+                "Ultimate Performance Power Plan",
+                "Disables CPU core parking & idle states — lower micro-latency than High Performance",
+                () -> runPowerShell(
+                    "$existing = powercfg /list | Select-String 'Ultimate';" +
+                    "if (-not $existing) {" +
+                    "  $guid = (powercfg /duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 2>&1);" +
+                    "  $guid = ($guid -split ' ')[-1].Trim()" +
+                    "} else {" +
+                    "  $guid = ($existing -split ' ')[-1].Trim()" +
+                    "};" +
+                    "powercfg /setactive $guid;" +
+                    "Write-Output \"Ultimate Performance Plan active: $guid\"")
         ));
         prepActions.add(new PrepAction(
                 "Enable Windows Game Mode",
@@ -370,6 +379,61 @@ public class GameSessionPrepApp extends Application {
                     "} else { Write-Output 'OneDrive not running' }")
         ));
         prepActions.add(new PrepAction(
+                "Win32PrioritySeparation (Input Lag Tweak)",
+                "Sets foreground app quantum to shortest — game gets more CPU time slices, lower input lag",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' " +
+                    "  -Name 'Win32PrioritySeparation' -Value 26 -Type DWord -Force;" +
+                    "Write-Output 'Win32PrioritySeparation set to 26 (low latency mode)'")
+        ));
+        prepActions.add(new PrepAction(
+                "Disable Paging Executive (Keep Kernel in RAM)",
+                "Forces kernel code to stay in physical RAM instead of pagefile — reduces DPC latency spikes",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' " +
+                    "  -Name 'DisablePagingExecutive' -Value 1 -Type DWord -Force;" +
+                    "Write-Output 'DisablePagingExecutive enabled'")
+        ));
+        prepActions.add(new PrepAction(
+                "Remove Network Throttling Index",
+                "Removes Windows multimedia network bandwidth cap — improves sustained network throughput",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                    "  -Name 'NetworkThrottlingIndex' -Value 0xffffffff -Type DWord -Force;" +
+                    "Write-Output 'NetworkThrottlingIndex removed'")
+        ));
+        prepActions.add(new PrepAction(
+                "Enable Hardware-Accelerated GPU Scheduling",
+                "Shifts GPU scheduling to the GPU itself — reduces latency on RTX 20+ and RDNA GPUs",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' " +
+                    "  -Name 'HwSchMode' -Value 2 -Type DWord -Force;" +
+                    "Write-Output 'HAGS enabled (restart required to take effect)'")
+        ));
+        prepActions.add(new PrepAction(
+                "Switch DNS to Cloudflare (1.1.1.1)",
+                "Fastest public DNS — reduces initial server connection latency vs ISP DNS",
+                () -> runPowerShell(
+                    "Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object {" +
+                    "  Set-DnsClientServerAddress -InterfaceIndex $_.ifIndex -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                    "  Write-Output \"DNS set to Cloudflare on $($_.Name)\"" +
+                    "}")
+        ));
+        prepActions.add(new PrepAction(
+                "Stop SysMain (Superfetch)",
+                "On SSDs, Superfetch provides no benefit and causes background disk/RAM activity during gaming",
+                () -> runPowerShell(
+                    "Stop-Service -Name SysMain -Force -ErrorAction SilentlyContinue;" +
+                    "Write-Output 'SysMain stopped'")
+        ));
+        prepActions.add(new PrepAction(
+                "Stop DiagTrack (Telemetry)",
+                "Stops Windows telemetry service that periodically wakes up and consumes CPU/network",
+                () -> runPowerShell(
+                    "Stop-Service -Name DiagTrack -Force -ErrorAction SilentlyContinue;" +
+                    "Write-Output 'DiagTrack stopped'")
+        ));
+        prepActions.add(new PrepAction(
                 "Clear Temp Files",
                 "Remove temp files to free disk space and reduce background I/O",
                 () -> runPowerShell(
@@ -418,6 +482,15 @@ public class GameSessionPrepApp extends Application {
                             "  }" +
                             "}" +
                             "Write-Output 'Done'")
+                ));
+                gameActions.add(new PrepAction(
+                        "[R6] Enable NVIDIA Low Latency Mode",
+                        "Sets NVIDIA global Low Latency Mode to Ultra — reduces R6S input lag by up to 30ms",
+                        () -> runPowerShell(
+                            "$reg = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\nvlddmkm\\Global\\NVTweak';" +
+                            "if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null };" +
+                            "Set-ItemProperty -Path $reg -Name 'NVLLMode' -Value 1 -Type DWord -Force;" +
+                            "Write-Output 'NVIDIA Low Latency Mode set to Ultra (restart display driver or reboot to apply)'")
                 ));
                 gameActions.add(new PrepAction(
                         "[R6] Flush Ubisoft Connect Cache",
@@ -552,6 +625,53 @@ public class GameSessionPrepApp extends Application {
                 "Restore Balanced Power Plan",
                 "Return to the default balanced power profile",
                 () -> runPowerShell("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restore Win32PrioritySeparation",
+                "Reset CPU scheduling to Windows default (2)",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' " +
+                    "  -Name 'Win32PrioritySeparation' -Value 2 -Type DWord -Force;" +
+                    "Write-Output 'Win32PrioritySeparation restored to default'")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restore Paging Executive Default",
+                "Re-enable normal kernel paging",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' " +
+                    "  -Name 'DisablePagingExecutive' -Value 0 -Type DWord -Force;" +
+                    "Write-Output 'DisablePagingExecutive restored'")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restore Network Throttling Index",
+                "Re-enable Windows default multimedia network throttling (10)",
+                () -> runPowerShell(
+                    "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                    "  -Name 'NetworkThrottlingIndex' -Value 10 -Type DWord -Force;" +
+                    "Write-Output 'NetworkThrottlingIndex restored to 10'")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restore ISP DNS",
+                "Remove Cloudflare DNS override — back to automatic/ISP DNS",
+                () -> runPowerShell(
+                    "Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object {" +
+                    "  Set-DnsClientServerAddress -InterfaceIndex $_.ifIndex -ResetServerAddresses;" +
+                    "  Write-Output \"DNS reset on $($_.Name)\"" +
+                    "}")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restart SysMain",
+                "Resume Superfetch service",
+                () -> runPowerShell(
+                    "Start-Service -Name SysMain -ErrorAction SilentlyContinue;" +
+                    "Write-Output 'SysMain restarted'")
+        ));
+        restoreActions.add(new PrepAction(
+                "Restart DiagTrack",
+                "Resume Windows telemetry service",
+                () -> runPowerShell(
+                    "Start-Service -Name DiagTrack -ErrorAction SilentlyContinue;" +
+                    "Write-Output 'DiagTrack restarted'")
         ));
         restoreActions.add(new PrepAction(
                 "Restore Default GPU Preference",
