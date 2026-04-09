@@ -575,40 +575,92 @@ public class GameSessionPrepApp extends Application {
 
     // ── Result dialog ─────────────────────────────────────────────────────────
     private void showResultDialog(List<PrepActionResult> results, javafx.util.Callback<Stage, Void> ignored) {
-        StringBuilder sb = new StringBuilder();
+        long passed = results.stream().filter(PrepActionResult::isSuccess).count();
+        long failed = results.size() - passed;
+        boolean allGood = failed == 0;
+
+        Stage popup = new Stage();
+        popup.setTitle(restoreMode ? "Restore Complete" : "System Ready — " + selectedGame);
+        popup.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+
+        // Header
+        Label icon = new Label(allGood ? "✓" : "⚠");
+        icon.setStyle("-fx-font-size: 36px; -fx-text-fill: " + (allGood ? GREEN : AMBER) + ";");
+
+        Label headline = new Label(allGood
+            ? (restoreMode ? "System Restored" : "System Ready to Game")
+            : passed + " succeeded · " + failed + " failed");
+        headline.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
+                          "-fx-text-fill: " + TEXT + ";");
+
+        Label sub = new Label(allGood
+            ? "All " + passed + " optimizations applied successfully."
+            : "Some actions failed — check the log for details.");
+        sub.setStyle("-fx-font-size: 11px; -fx-font-family: Consolas; -fx-text-fill: " + TEXT_DIM + ";");
+
+        VBox headerBox = new VBox(6, icon, headline, sub);
+        headerBox.setAlignment(Pos.CENTER);
+        headerBox.setPadding(new Insets(24, 24, 16, 24));
+
+        // Results list
+        VBox resultList = new VBox(4);
+        resultList.setPadding(new Insets(0, 16, 8, 16));
         for (PrepActionResult r : results) {
-            sb.append(r.isSuccess() ? "✓ " : "✗ ").append(r.getActionName()).append("\n");
+            String color = r.isSuccess() ? GREEN : RED;
+            String prefix = r.isSuccess() ? "✓ " : "✗ ";
+            Label row = new Label(prefix + r.getActionName());
+            row.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + color + ";");
+            resultList.getChildren().add(row);
             String msg = r.getMessage();
-            if (msg != null && !msg.isBlank() && !msg.equals("OK"))
-                sb.append("  → ").append(msg.replace("\n", "\n  ")).append("\n");
-            sb.append("\n");
+            if (msg != null && !msg.isBlank() && !msg.equals("OK") && !r.isSuccess()) {
+                Label detail = new Label("   → " + msg.split("\n")[0]);
+                detail.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-text-fill: " + TEXT_DIM + ";");
+                detail.setWrapText(true);
+                resultList.getChildren().add(detail);
+            }
         }
 
-        TextArea ta = new TextArea(sb.toString().trim());
-        ta.setEditable(false);
-        ta.setWrapText(true);
-        ta.setPrefWidth(500);
-        ta.setPrefHeight(340);
-        ta.setStyle(
-            "-fx-font-family: Consolas; -fx-font-size: 12px; " +
-            "-fx-control-inner-background: #0d0d0d; -fx-text-fill: " + TEXT + ";");
+        ScrollPane scroll = new ScrollPane(resultList);
+        scroll.setFitToWidth(true);
+        scroll.setPrefHeight(Math.min(results.size() * 26 + 20, 260));
+        scroll.setStyle("-fx-background: " + BG_CARD2 + "; -fx-background-color: " + BG_CARD2 +
+                        "; -fx-border-color: " + BORDER + "; -fx-border-radius: 6;");
 
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle(restoreMode ? "Restore Results" : "Prep Results — " + selectedGame);
-        dialog.setHeaderText("Completed " + results.size() + " action(s)");
-        dialog.getDialogPane().setContent(ta);
-        dialog.getDialogPane().setPrefWidth(540);
-        dialog.getDialogPane().setStyle("-fx-background-color: " + BG_CARD + ";");
+        // Buttons
+        Button closeBtn = new Button("Done");
+        closeBtn.setStyle("-fx-background-color: " + PURPLE + "; -fx-text-fill: white; " +
+                          "-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                          "-fx-padding: 8 28; -fx-background-radius: 8; -fx-cursor: hand;");
+        closeBtn.setOnAction(e -> popup.close());
 
-        ButtonType openLog = new ButtonType("Open Log", ButtonBar.ButtonData.LEFT);
-        dialog.getDialogPane().getButtonTypes().addAll(openLog, ButtonType.OK);
-        dialog.resultConverterProperty().set(bt -> {
-            if (bt == openLog && Files.exists(LOG_FILE) && Desktop.isDesktopSupported()) {
-                try { Desktop.getDesktop().open(LOG_FILE.toFile()); } catch (IOException ignored2) {}
+        Button logBtn = new Button("Open Log");
+        logBtn.setStyle(smallBtnStyle(TEXT_DIM));
+        logBtn.setOnAction(e -> {
+            if (Files.exists(LOG_FILE) && Desktop.isDesktopSupported()) {
+                try { Desktop.getDesktop().open(LOG_FILE.toFile()); } catch (IOException ex) {}
             }
-            return null;
         });
-        dialog.showAndWait();
+
+        HBox btnRow = new HBox(10, logBtn, new Region(), closeBtn);
+        HBox.setHgrow(btnRow.getChildren().get(1), Priority.ALWAYS);
+        btnRow.setAlignment(Pos.CENTER);
+        btnRow.setPadding(new Insets(12, 20, 20, 20));
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: " + BORDER + ";");
+
+        VBox root = new VBox(0, headerBox, sep,
+                new javafx.scene.layout.StackPane(scroll) {{ setPadding(new Insets(12, 16, 8, 16)); }},
+                btnRow);
+        root.setStyle("-fx-background-color: " + BG_CARD + ";");
+
+        Scene scene = new Scene(root, 460, 0);
+        root.layout();
+        popup.setScene(scene);
+        popup.sizeToScene();
+        popup.setResizable(false);
+        popup.show();
+        closeBtn.requestFocus();
     }
 
     // ── Session timer ─────────────────────────────────────────────────────────
@@ -670,11 +722,10 @@ public class GameSessionPrepApp extends Application {
         tray.setImageAutoSize(true);
         show.addActionListener(e -> Platform.runLater(() -> { stage.show(); stage.toFront(); }));
         tray.addActionListener(e -> Platform.runLater(() -> { stage.show(); stage.toFront(); }));
-        quit.addActionListener(e -> { SystemTray.getSystemTray().remove(tray); Platform.exit(); });
-        Platform.setImplicitExit(false);
-        stage.setOnCloseRequest(e -> { e.consume(); stage.hide(); });
+        quit.addActionListener(e -> { SystemTray.getSystemTray().remove(tray); Platform.exit(); System.exit(0); });
+        stage.setOnCloseRequest(e -> { Platform.exit(); System.exit(0); });
         try { SystemTray.getSystemTray().add(tray); }
-        catch (AWTException ignored) { Platform.setImplicitExit(true); stage.setOnCloseRequest(null); }
+        catch (AWTException ignored) {}
     }
 
     // ── Process helpers ───────────────────────────────────────────────────────
