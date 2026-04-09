@@ -160,6 +160,7 @@ public class GameSessionPrepApp extends Application {
         Scene scene = new Scene(root, 780, 700);
         stage.setTitle("◈ GAME READY TOOLKIT ◈");
         stage.setMinWidth(620);
+        stage.getIcons().add(buildAppIcon());
         stage.setScene(scene);
         stage.show();
 
@@ -171,13 +172,11 @@ public class GameSessionPrepApp extends Application {
         // Logo / title
         Label title = new Label("GAME READY");
         title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                       "-fx-text-fill: " + CYAN + "; " +
-                       "-fx-effect: dropshadow(gaussian, " + CYAN + ", 12, 0.8, 0, 0);");
+                       "-fx-text-fill: " + CYAN + ";");
 
         Label subtitle = new Label("TOOLKIT");
         subtitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-text-fill: " + PINK + "; " +
-                          "-fx-effect: dropshadow(gaussian, " + PINK + ", 12, 0.8, 0, 0);");
+                          "-fx-text-fill: " + PINK + ";");
 
         HBox logoBox = new HBox(8, title, subtitle);
         logoBox.setAlignment(Pos.CENTER_LEFT);
@@ -185,8 +184,7 @@ public class GameSessionPrepApp extends Application {
         // Timer
         timerLabel = new Label();
         timerLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 12px; " +
-                            "-fx-font-family: Consolas; -fx-font-weight: bold; " +
-                            "-fx-effect: dropshadow(gaussian, " + GREEN + ", 8, 0.6, 0, 0);");
+                            "-fx-font-family: Consolas; -fx-font-weight: bold;");
         timerLabel.setVisible(false);
 
         Region spacer = new Region();
@@ -231,8 +229,7 @@ public class GameSessionPrepApp extends Application {
         sysInfoLabel = new Label("CPU: --   RAM: --");
         sysInfoLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 10px; " +
                               "-fx-font-family: Consolas; -fx-font-weight: bold; " +
-                              "-fx-padding: 0 20 8 20; " +
-                              "-fx-effect: dropshadow(gaussian, " + GREEN + ", 6, 0.5, 0, 0);");
+                              "-fx-padding: 0 20 8 20;");
         startSysInfoUpdater();
 
         HBox bottomStrip = new HBox();
@@ -393,11 +390,9 @@ public class GameSessionPrepApp extends Application {
 
         // Tile header
         Circle dot = new Circle(5, Color.web(color));
-        dot.setStyle("-fx-effect: dropshadow(gaussian, " + color + ", 8, 0.9, 0, 0);");
         Label catLabel = new Label("▌ " + category.toUpperCase());
         catLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px; " +
-                          "-fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-effect: dropshadow(gaussian, " + color + ", 6, 0.6, 0, 0);");
+                          "-fx-font-weight: bold; -fx-font-family: Consolas;");
 
         // Pulse animation on dot
         FadeTransition pulse = new FadeTransition(Duration.millis(900), dot);
@@ -452,11 +447,10 @@ public class GameSessionPrepApp extends Application {
 
     // ── Styles ────────────────────────────────────────────────────────────────
     private String runBtnStyle() {
-        return "-fx-background-color: " + PINK + "; -fx-text-fill: " + BG + "; " +
+        return "-fx-background-color: " + PINK + "; -fx-text-fill: #000000; " +
                "-fx-font-size: 13px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
                "-fx-border-color: " + PINK + "; -fx-border-width: 2; " +
-               "-fx-padding: 9 26; -fx-cursor: hand; " +
-               "-fx-effect: dropshadow(gaussian, " + PINK + ", 14, 0.7, 4, 4);";
+               "-fx-padding: 9 26; -fx-cursor: hand;";
     }
 
     private String toggleStyle(boolean active) {
@@ -464,16 +458,14 @@ public class GameSessionPrepApp extends Application {
         return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
                "-fx-border-color: " + color + "; -fx-border-width: 2; " +
                "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-               "-fx-padding: 7 14; -fx-cursor: hand; " +
-               "-fx-effect: dropshadow(gaussian, " + color + ", 8, 0.5, 2, 2);";
+               "-fx-padding: 7 14; -fx-cursor: hand;";
     }
 
     private String smallBtnStyle(String color) {
         return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
                "-fx-border-color: " + color + "; -fx-border-width: 2; " +
                "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-               "-fx-padding: 7 14; -fx-cursor: hand; " +
-               "-fx-effect: dropshadow(gaussian, " + color + ", 6, 0.4, 2, 2);";
+               "-fx-padding: 7 14; -fx-cursor: hand;";
     }
 
     // ── Select helpers ────────────────────────────────────────────────────────
@@ -593,15 +585,13 @@ public class GameSessionPrepApp extends Application {
         // Header
         String mainColor = allGood ? GREEN : AMBER;
         Label icon = new Label(allGood ? "✓" : "⚠");
-        icon.setStyle("-fx-font-size: 42px; -fx-text-fill: " + mainColor + "; " +
-                      "-fx-effect: dropshadow(gaussian, " + mainColor + ", 16, 0.9, 0, 0);");
+        icon.setStyle("-fx-font-size: 42px; -fx-text-fill: " + mainColor + ";");
 
         Label headline = new Label(allGood
             ? (restoreMode ? "SYSTEM RESTORED" : "SYSTEM READY TO GAME")
             : passed + " SUCCEEDED · " + failed + " FAILED");
         headline.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-text-fill: " + mainColor + "; " +
-                          "-fx-effect: dropshadow(gaussian, " + mainColor + ", 8, 0.6, 0, 0);");
+                          "-fx-text-fill: " + mainColor + ";");
 
         Label sub = new Label(allGood
             ? "All " + passed + " optimizations applied successfully."
@@ -715,6 +705,47 @@ public class GameSessionPrepApp extends Application {
             sb.append("\n");
             Files.writeString(LOG_FILE, sb.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException ignored) {}
+    }
+
+    // ── App icon ──────────────────────────────────────────────────────────────
+    private javafx.scene.image.Image buildAppIcon() {
+        int size = 64;
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                           java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Background — deep purple
+        g.setColor(new java.awt.Color(0x0d, 0x00, 0x15));
+        g.fillRoundRect(0, 0, size, size, 14, 14);
+
+        // Outer neon pink border
+        g.setColor(new java.awt.Color(0xff, 0x00, 0xcc));
+        g.setStroke(new java.awt.BasicStroke(3f));
+        g.drawRoundRect(2, 2, size - 4, size - 4, 12, 12);
+
+        // Lightning bolt ⚡ in cyan
+        g.setColor(new java.awt.Color(0x00, 0xff, 0xff));
+        int[] bx = {36, 26, 32, 22, 38, 28, 34};
+        int[] by = { 8, 28, 28, 56, 36, 36,  8};
+        g.fillPolygon(bx, by, 7);
+
+        // Yellow outline on bolt
+        g.setColor(new java.awt.Color(0xff, 0xff, 0x00));
+        g.setStroke(new java.awt.BasicStroke(1.5f));
+        g.drawPolygon(bx, by, 7);
+
+        g.dispose();
+
+        // Convert to JavaFX Image
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        try {
+            javax.imageio.ImageIO.write(img, "png", baos);
+            return new javafx.scene.image.Image(
+                new java.io.ByteArrayInputStream(baos.toByteArray()));
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     // ── System tray ───────────────────────────────────────────────────────────
