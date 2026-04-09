@@ -200,9 +200,18 @@ public class GameSessionPrepApp extends Application {
         gameCombo.setValue(PREFS.get("selected_game", "General"));
         selectedGame = gameCombo.getValue();
         gameCombo.setStyle(
-            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + CYAN + "; " +
+            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: #ffffff; " +
             "-fx-border-color: " + CYAN + "; -fx-border-width: 2; " +
             "-fx-font-size: 12px; -fx-font-family: Consolas; -fx-font-weight: bold; -fx-pref-width: 210px;");
+        // Force the button cell text to white too
+        gameCombo.setButtonCell(new javafx.scene.control.ListCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item);
+                setStyle("-fx-text-fill: #ffffff; -fx-font-family: Consolas; -fx-font-weight: bold; " +
+                         "-fx-font-size: 12px; -fx-background-color: " + BG_CARD2 + ";");
+            }
+        });
 
         gameCombo.setOnAction(e -> {
             selectedGame = gameCombo.getValue();
