@@ -77,6 +77,8 @@ public class GameSessionPrepApp extends Application {
     private Label   gameDescLabel;
     private Label   sysInfoLabel;
     private ProgressBar progressBar;
+    private TextArea debugLog;
+    private TabPane  tabPane;
 
     private long   sessionStartMs    = -1;
     private Thread sessionTimerThread;
@@ -139,7 +141,7 @@ public class GameSessionPrepApp extends Application {
         // ── TOP BAR ───────────────────────────────────────────────────────────
         root.setTop(buildTopBar());
 
-        // ── CENTER: scrollable tile grid ──────────────────────────────────────
+        // ── CENTER: tabs ──────────────────────────────────────────────────────
         tilesContainer = new VBox(14);
         tilesContainer.setPadding(new Insets(16));
         tilesContainer.setStyle("-fx-background-color: " + BG + ";");
@@ -152,7 +154,40 @@ public class GameSessionPrepApp extends Application {
                         "; -fx-border-color: transparent;");
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        root.setCenter(scroll);
+        // Optimize tab
+        Tab optimizeTab = new Tab("  ⚡ OPTIMIZE  ", scroll);
+        optimizeTab.setClosable(false);
+        optimizeTab.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold;");
+
+        // Debug tab
+        debugLog = new TextArea("[ No runs yet — hit PREPARE SYSTEM to see output here ]\n");
+        debugLog.setEditable(false);
+        debugLog.setWrapText(true);
+        debugLog.setStyle(
+            "-fx-font-family: Consolas; -fx-font-size: 12px; " +
+            "-fx-control-inner-background: #080010; -fx-text-fill: #00ff00; " +
+            "-fx-border-color: transparent;");
+
+        Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
+        debugTab.setClosable(false);
+
+        tabPane = new TabPane(optimizeTab, debugTab);
+        tabPane.setStyle(
+            "-fx-background-color: " + BG + "; " +
+            "-fx-tab-min-height: 32px; " +
+            "-fx-tab-max-height: 32px;");
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        // Style tab headers via CSS
+        tabPane.getStylesheets().add("data:text/css," +
+            ".tab-pane .tab-header-area .tab-header-background{-fx-background-color:" + BG_CARD + ";}" +
+            ".tab-pane .tab{-fx-background-color:" + BG_CARD2 + ";-fx-border-color:" + BORDER + ";-fx-border-width:0 1 0 0;}" +
+            ".tab-pane .tab:selected{-fx-background-color:" + BG + ";-fx-border-color:" + PINK + ";-fx-border-width:0 0 2 0;}" +
+            ".tab-pane .tab .tab-label{-fx-text-fill:" + TEXT_DIM + ";-fx-font-family:Consolas;-fx-font-weight:bold;-fx-font-size:11px;}" +
+            ".tab-pane .tab:selected .tab-label{-fx-text-fill:" + CYAN + ";}" +
+            ".tab-pane>.tab-content-area{-fx-background-color:" + BG + ";}");
+
+        root.setCenter(tabPane);
 
         // ── BOTTOM BAR ────────────────────────────────────────────────────────
         root.setBottom(buildBottomBar(stage));
@@ -558,6 +593,7 @@ public class GameSessionPrepApp extends Application {
             else if (restoreMode) stopSessionTimer();
 
             writeLog(results);
+            writeDebugLog(results);
             showResultDialog(results, stage -> null);
 
             if (failed == 0) {
@@ -566,6 +602,8 @@ public class GameSessionPrepApp extends Application {
             } else {
                 statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
                 statusLabel.setText("⚠ " + passed + " succeeded, " + failed + " failed.");
+                // Auto-switch to debug tab so user can see what failed
+                if (tabPane != null) tabPane.getSelectionModel().select(1);
             }
         });
 
@@ -755,6 +793,37 @@ public class GameSessionPrepApp extends Application {
         } catch (IOException e) {
             return null;
         }
+    }
+
+    // ── Debug log ─────────────────────────────────────────────────────────────
+    private void writeDebugLog(List<PrepActionResult> results) {
+        if (debugLog == null) return;
+        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        String mode = restoreMode ? "RESTORE" : "PREPARE — " + selectedGame;
+        StringBuilder sb = new StringBuilder();
+        sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        sb.append("[ ").append(ts).append(" ] ").append(mode).append("\n");
+        sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
+        for (PrepActionResult r : results) {
+            String status = r.isSuccess() ? "✓ PASS" : "✗ FAIL";
+            sb.append(status).append("  ").append(r.getActionName()).append("\n");
+            String msg = r.getMessage();
+            if (msg != null && !msg.isBlank() && !msg.equals("OK")) {
+                // Indent each line of the output
+                for (String line : msg.split("\n")) {
+                    sb.append("       ").append(line.trim()).append("\n");
+                }
+            }
+            sb.append("\n");
+        }
+        long passed = results.stream().filter(PrepActionResult::isSuccess).count();
+        long failed = results.size() - passed;
+        sb.append("RESULT: ").append(passed).append(" passed, ").append(failed).append(" failed.\n\n");
+        Platform.runLater(() -> {
+            // Prepend new run above old output
+            debugLog.setText(sb + debugLog.getText());
+            debugLog.positionCaret(0);
+        });
     }
 
     // ── System tray ───────────────────────────────────────────────────────────
