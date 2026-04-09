@@ -11,7 +11,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -75,6 +74,8 @@ public class GameSessionPrepApp extends Application {
     private VBox    tilesContainer;
     private Label   timerLabel;
     private Label   statusLabel;
+    private Label   gameDescLabel;
+    private Label   sysInfoLabel;
     private ProgressBar progressBar;
 
     private long   sessionStartMs    = -1;
@@ -105,14 +106,19 @@ public class GameSessionPrepApp extends Application {
     // ── Entry ─────────────────────────────────────────────────────────────────
     public static void main(String[] args) throws Exception {
         if (!isElevated()) {
-            String javaExe = ProcessHandle.current().info().command().orElse("java");
-            String jarPath = GameSessionPrepApp.class
-                    .getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-            String psCommand = String.format(
-                "Start-Process -FilePath '%s' -ArgumentList '-jar \"%s\"' -Verb RunAs",
-                javaExe.replace("'", "''"), jarPath.replace("\"", "\\\""));
-            new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", psCommand).start();
-            System.exit(0);
+            // Try to relaunch as admin via the JAR path; if running from Maven classes, skip relaunch
+            java.net.URL loc = GameSessionPrepApp.class
+                    .getProtectionDomain().getCodeSource().getLocation();
+            String locationPath = loc != null ? loc.toURI().getPath() : "";
+            if (locationPath.endsWith(".jar")) {
+                String javaExe = ProcessHandle.current().info().command().orElse("java");
+                String psCommand = String.format(
+                    "Start-Process -FilePath '%s' -ArgumentList '-jar \"%s\"' -Verb RunAs",
+                    javaExe.replace("'", "''"), locationPath.replace("\"", "\\\""));
+                new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", psCommand).start();
+                System.exit(0);
+            }
+            // Running from Maven/IDE — continue without elevation (some actions may fail)
         }
         launch();
     }
@@ -159,7 +165,7 @@ public class GameSessionPrepApp extends Application {
     }
 
     // ── Top bar ───────────────────────────────────────────────────────────────
-    private HBox buildTopBar() {
+    private VBox buildTopBar() {
         // Logo / title
         Label logo = new Label("⚡");
         logo.setStyle("-fx-font-size: 22px;");
@@ -203,18 +209,64 @@ public class GameSessionPrepApp extends Application {
             PREFS.put("selected_game", selectedGame);
             buildGameActions();
             refreshTiles();
+            if (gameDescLabel != null)
+                gameDescLabel.setText(GAME_PROFILES.getOrDefault(selectedGame, ""));
         });
 
         VBox gamePicker = new VBox(2, gameLabel, gameCombo);
         gamePicker.setAlignment(Pos.CENTER_LEFT);
 
-        HBox topBar = new HBox(16, logoBox, spacer, timerLabel, gamePicker);
-        topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(16, 20, 16, 20));
+        HBox mainRow = new HBox(16, logoBox, spacer, timerLabel, gamePicker);
+        mainRow.setAlignment(Pos.CENTER_LEFT);
+        mainRow.setPadding(new Insets(14, 20, 8, 20));
+
+        // Game description strip
+        gameDescLabel = new Label(GAME_PROFILES.getOrDefault(selectedGame, ""));
+        gameDescLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 10px; " +
+                               "-fx-font-family: Consolas; -fx-padding: 0 20 0 20;");
+
+        // Sys info strip
+        sysInfoLabel = new Label("  CPU: --   RAM: --");
+        sysInfoLabel.setStyle("-fx-text-fill: " + CYAN + "99; -fx-font-size: 10px; " +
+                              "-fx-font-family: Consolas; -fx-padding: 0 20 6 20;");
+        startSysInfoUpdater();
+
+        HBox bottomStrip = new HBox();
+        bottomStrip.getChildren().addAll(gameDescLabel, new Region(), sysInfoLabel);
+        HBox.setHgrow(bottomStrip.getChildren().get(1), Priority.ALWAYS);
+        bottomStrip.setMaxWidth(Double.MAX_VALUE);
+
+        VBox topBar = new VBox(0, mainRow, bottomStrip);
         topBar.setStyle("-fx-background-color: " + BG_CARD + "; " +
                         "-fx-border-color: " + BORDER + "; " +
                         "-fx-border-width: 0 0 1 0;");
         return topBar;
+    }
+
+    private void startSysInfoUpdater() {
+        Thread t = new Thread(() -> {
+            com.sun.management.OperatingSystemMXBean os =
+                (com.sun.management.OperatingSystemMXBean)
+                java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    double cpu = os.getCpuLoad() * 100;
+                    long totalRam = os.getTotalMemorySize();
+                    long freeRam  = os.getFreeMemorySize();
+                    long usedRam  = totalRam - freeRam;
+                    String cpuStr = cpu < 0 ? "--" : String.format("%.0f%%", cpu);
+                    String ramStr = String.format("%d / %d GB",
+                        usedRam / (1024*1024*1024), totalRam / (1024*1024*1024));
+                    Platform.runLater(() -> {
+                        if (sysInfoLabel != null)
+                            sysInfoLabel.setText("CPU: " + cpuStr + "   RAM: " + ramStr);
+                    });
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) { break; }
+            }
+        });
+        t.setDaemon(true);
+        t.start();
     }
 
     // ── Bottom bar ────────────────────────────────────────────────────────────
@@ -288,11 +340,14 @@ public class GameSessionPrepApp extends Application {
         for (Map.Entry<String, List<PrepAction>> entry : grouped.entrySet()) {
             if (col % 2 == 0) {
                 row = new HBox(12);
+                row.setMaxWidth(Double.MAX_VALUE);
+                row.setFillHeight(true);
                 tilesContainer.getChildren().add(row);
             }
             VBox tile = buildCategoryTile(entry.getKey(), entry.getValue());
             HBox.setHgrow(tile, Priority.ALWAYS);
             tile.setMaxWidth(Double.MAX_VALUE);
+            tile.setMinWidth(0);
             row.getChildren().add(tile);
             col++;
         }
@@ -338,10 +393,8 @@ public class GameSessionPrepApp extends Application {
         HBox header = new HBox(8, dot, catLabel);
         header.setAlignment(Pos.CENTER_LEFT);
 
-        Rectangle divider = new Rectangle();
-        divider.setHeight(1);
-        divider.setFill(Color.web(color + "33"));
-        divider.widthProperty().bind(tile.widthProperty().subtract(28));
+        Separator divider = new Separator();
+        divider.setStyle("-fx-background-color: " + color + "33; -fx-padding: 0;");
 
         tile.getChildren().addAll(header, divider);
 
