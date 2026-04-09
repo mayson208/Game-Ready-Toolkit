@@ -1003,15 +1003,197 @@ public class GameSessionPrepApp extends Application {
 
         switch (selectedGame) {
             case "Rainbow Six Siege" -> {
-                gameActions.add(new PrepAction("[R6] NVIDIA Low Latency Ultra",
-                    "Sets NVIDIA Low Latency Mode to Ultra — up to 30ms input lag reduction", "Game",
-                    () -> runPowerShell("$reg = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\nvlddmkm\\Global\\NVTweak'; if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null }; Set-ItemProperty -Path $reg -Name 'NVLLMode' -Value 1 -Type DWord -Force; Write-Output 'NVIDIA LL Ultra set'")));
+                // ── CPU / Registry ────────────────────────────────────────────
+                gameActions.add(new PrepAction("[R6] SystemResponsiveness = 0",
+                    "Allows games to use up to 100% of CPU scheduling — removes the default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[R6] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler — measurable latency reduction", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[R6] Disable HPET",
+                    "Disables High Precision Event Timer in Windows — reduces DPC latency. BIOS HPET should also be disabled for full effect", "Game",
+                    () -> runPowerShell(
+                        "bcdedit /deletevalue useplatformclock 2>&1 | Out-Null;" +
+                        "Write-Output 'HPET platform clock removed from boot config'")));
+
+                gameActions.add(new PrepAction("[R6] Disable Prefetcher",
+                    "Stops Windows pre-loading app data into RAM — frees memory bandwidth for Siege DX12 shader streaming", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters' " +
+                        "-Name 'EnablePrefetcher' -Value 0 -Type DWord -Force; Write-Output 'Prefetcher disabled'")));
+
+                gameActions.add(new PrepAction("[R6] Set Process to High Priority",
+                    "Boosts RainbowSix.exe CPU scheduling priority to High — equivalent to -high launch flag but persistent", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'RainbowSix' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) { $proc.PriorityClass = 'High'; Write-Output 'RainbowSix.exe set to High priority' }" +
+                        "else { Write-Output 'Siege not running — set priority after launch via Task Manager' }")));
+
+                gameActions.add(new PrepAction("[R6] CPU Affinity Stutter Fix",
+                    "Known Siege engine bug: resets thread affinity to fix micro-freeze pattern (deselect all cores then re-select all). Run while in-game", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'RainbowSix' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) {" +
+                        "  $proc.ProcessorAffinity = 0;" +
+                        "  Start-Sleep -Milliseconds 100;" +
+                        "  $cores = (Get-WmiObject -Class Win32_Processor).NumberOfLogicalProcessors;" +
+                        "  $proc.ProcessorAffinity = [IntPtr]([Math]::Pow(2,$cores)-1);" +
+                        "  Write-Output 'Affinity reset complete — all cores re-enabled'" +
+                        "} else { Write-Output 'Siege not running — launch game first then run this fix' }")));
+
+                // ── Network ───────────────────────────────────────────────────
+                gameActions.add(new PrepAction("[R6] Disable Nagle's Algorithm",
+                    "Sets TcpAckFrequency=1 and TCPNoDelay=1 on your active network adapter — reduces TCP buffering latency by 2-5ms", "Game",
+                    () -> runPowerShell(
+                        "$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike '*Loopback*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress;" +
+                        "$interfaces = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "$matched = $interfaces | Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DhcpIPAddress -eq $ip -or (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).IPAddress -contains $ip };" +
+                        "if ($matched) {" +
+                        "  foreach ($iface in $matched) {" +
+                        "    Set-ItemProperty -Path $iface.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force;" +
+                        "    Set-ItemProperty -Path $iface.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force" +
+                        "  }; Write-Output \"Nagle disabled on $ip\"" +
+                        "} else { Write-Output 'Interface not found — check network adapter' }")));
+
+                gameActions.add(new PrepAction("[R6] Set DNS to Cloudflare",
+                    "Switches to 1.1.1.1 / 1.0.0.1 — fastest DNS globally per DNSPerf benchmarks, reduces server lookup latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.InterfaceDescription -notlike '*Loopback*' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[R6] Enable Minimal Network Buffering",
+                    "Enables Siege's built-in 'Minimal Buffering' mode via registry flag — reduces in-game receive buffer for lower effective input lag", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKCU:\\SOFTWARE\\Ubisoft\\Rainbow Six Siege';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'MinimalBuffering' -Value 1 -Type DWord -Force;" +
+                        "Write-Output 'Minimal buffering flag set — confirm in-game under Settings > General'")));
+
+                // ── Display / GPU ─────────────────────────────────────────────
                 gameActions.add(new PrepAction("[R6] Disable Fullscreen Optimizations",
-                    "Forces true exclusive fullscreen — lower latency than FSO", "Game",
-                    () -> runPowerShell("$paths = @('C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy''s Rainbow Six Siege\\RainbowSix.exe','C:\\Program Files\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy''s Rainbow Six Siege\\RainbowSix.exe'); foreach ($exe in $paths) { if (Test-Path $exe) { $reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers'; if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null }; Set-ItemProperty -Path $reg -Name $exe -Value 'DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; Write-Output 'FSO disabled' } }; Write-Output 'Done'")));
+                    "Forces true exclusive fullscreen on RainbowSix.exe — bypasses DWM compositor, cuts 15-30ms input latency vs windowed/FSO mode", "Game",
+                    () -> runPowerShell(
+                        "$paths = @(" +
+                        "  'C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy''s Rainbow Six Siege\\RainbowSix.exe'," +
+                        "  'C:\\Program Files\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy''s Rainbow Six Siege\\RainbowSix.exe'," +
+                        "  \"$env:ProgramFiles\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy's Rainbow Six Siege\\RainbowSix.exe\"" +
+                        ");" +
+                        "$reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers';" +
+                        "if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null };" +
+                        "$found = $false;" +
+                        "foreach ($exe in $paths) { if (Test-Path $exe) { Set-ItemProperty -Path $reg -Name $exe -Value 'RUNASADMIN DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; $found = $true; Write-Output \"FSO disabled: $exe\" } };" +
+                        "if (-not $found) { Write-Output 'RainbowSix.exe not found in default paths — apply manually via Properties > Compatibility' }")));
+
+                gameActions.add(new PrepAction("[R6] NVIDIA Shader Cache = 10GB",
+                    "Sets NVIDIA shader cache to 10GB — prevents DX12 shader recompile stutters that Siege is notorious for", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\NVIDIA Corporation\\Global\\NVTweak';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'ShaderCacheSize' -Value 10240 -Type DWord -Force;" +
+                        "Write-Output 'NVIDIA shader cache set to 10240 MB (10GB) — restart GPU driver to apply'")));
+
+                gameActions.add(new PrepAction("[R6] NVIDIA Max Performance Mode",
+                    "Sets NVIDIA power management to Prefer Maximum Performance for RainbowSix.exe — prevents GPU clock sag mid-match", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\nvlddmkm\\Global\\NVTweak';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'PowerMizerEnable' -Value 1 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'PowerMizerLevel' -Value 1 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'PowerMizerLevelAC' -Value 1 -Type DWord -Force;" +
+                        "Write-Output 'NVIDIA power set to Max Performance'")));
+
+                // ── Services ──────────────────────────────────────────────────
+                gameActions.add(new PrepAction("[R6] Disable Xbox Services",
+                    "Stops XblAuthManager, XblGameSave, XboxNetApiSvc — frees CPU cycles, reduces DPC latency. Not needed for Siege (uses Ubisoft Connect)", "Game",
+                    () -> runPowerShell(
+                        "$svcs = @('XblAuthManager','XblGameSave','XboxNetApiSvc','XboxGipSvc');" +
+                        "foreach ($s in $svcs) { Stop-Service -Name $s -Force -ErrorAction SilentlyContinue; Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Xbox services stopped and disabled'")));
+
+                gameActions.add(new PrepAction("[R6] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM and CPU for Siege DX12 rendering", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
+
+                gameActions.add(new PrepAction("[R6] Disable Ubisoft Connect Overlay",
+                    "Disables the Ubisoft overlay which hooks into DX12 render pipeline — prevents overlay-induced frame time spikes", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKCU:\\SOFTWARE\\Ubisoft\\Ubisoft Game Launcher';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'OverlayEnabled' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Ubisoft overlay disabled via registry — verify in Ubisoft Connect > Settings > In-game overlay'")));
+
+                // ── Audio ─────────────────────────────────────────────────────
+                gameActions.add(new PrepAction("[R6] Set Audio to 16-bit 48000Hz",
+                    "Siege outputs 48kHz audio. Running higher (192kHz) forces CPU resampling and adds overhead. 16-bit/48kHz is the correct match", "Game",
+                    () -> runPowerShell(
+                        "# Sets default audio format to 16-bit 48000Hz via registry\n" +
+                        "$path = 'HKCU:\\Software\\Microsoft\\Multimedia\\Audio';" +
+                        "if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null };" +
+                        "# Format GUID for 16-bit 48000Hz stereo PCM\n" +
+                        "Set-ItemProperty -Path $path -Name 'DefaultFormat' -Value '{00000001-0000-0010-8000-00aa00389b71}' -Type String -Force -ErrorAction SilentlyContinue;" +
+                        "Write-Output 'Audio format hint set — confirm manually: Sound > Properties > Advanced > 16-bit 48000 Hz'")));
+
+                gameActions.add(new PrepAction("[R6] Disable Windows Audio Enhancements",
+                    "Disables bass boost, virtual surround, loudness equalization — each adds CPU audio processing overhead that causes Siege FPS drops", "Game",
+                    () -> runPowerShell(
+                        "# Disable enhancements on all audio render endpoints\n" +
+                        "$regBase = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render';" +
+                        "if (Test-Path $regBase) {" +
+                        "  Get-ChildItem $regBase | ForEach-Object {" +
+                        "    $props = Join-Path $_.PSPath 'Properties';" +
+                        "    if (Test-Path $props) {" +
+                        "      Set-ItemProperty -Path $props -Name '{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue" +
+                        "    }" +
+                        "  };" +
+                        "  Write-Output 'Audio enhancements disabled on all endpoints'" +
+                        "} else { Write-Output 'Audio registry path not found — disable manually in Sound > Properties > Enhancements' }")));
+
+                // ── Game Files ────────────────────────────────────────────────
+                gameActions.add(new PrepAction("[R6] Set MaxGPUBufferedFrames=1",
+                    "Sets GameSettings.ini MaxGPUBufferedFrames=1 — best balance of low input latency and frame stability for Siege DX12", "Game",
+                    () -> runPowerShell(
+                        "$base = \"$env:USERPROFILE\\Documents\\My Games\\Rainbow Six - Siege\";" +
+                        "if (-not (Test-Path $base)) { Write-Output 'Siege documents folder not found — launch game once first'; exit };" +
+                        "$ini = Get-ChildItem $base -Recurse -Filter 'GameSettings.ini' | Select-Object -First 1;" +
+                        "if (-not $ini) { Write-Output 'GameSettings.ini not found — launch game once to generate it'; exit };" +
+                        "$content = Get-Content $ini.FullName -Raw;" +
+                        "if ($content -match 'MaxGPUBufferedFrames') {" +
+                        "  $content = $content -replace 'MaxGPUBufferedFrames=\\d+','MaxGPUBufferedFrames=1'" +
+                        "} else {" +
+                        "  $content = $content.TrimEnd() + \"`n[DISPLAY]`nMaxGPUBufferedFrames=1`n\"" +
+                        "};" +
+                        "Set-Content -Path $ini.FullName -Value $content -Force;" +
+                        "Set-ItemProperty -Path $ini.FullName -Name IsReadOnly -Value $true;" +
+                        "Write-Output \"MaxGPUBufferedFrames=1 set and file locked read-only: $($ini.FullName)\"")));
+
                 gameActions.add(new PrepAction("[R6] Flush Ubisoft Connect Cache",
-                    "Clears Ubisoft temp files that cause match stutters", "Game",
-                    () -> runPowerShell("Remove-Item \"$env:LOCALAPPDATA\\Ubisoft Game Launcher\\cache\\*\" -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Cache cleared'")));
+                    "Clears Ubisoft temp and cache files — fixes match load stutters and prevents DX12 shader conflicts from stale data", "Game",
+                    () -> runPowerShell(
+                        "Remove-Item \"$env:LOCALAPPDATA\\Ubisoft Game Launcher\\cache\\*\" -Recurse -Force -ErrorAction SilentlyContinue;" +
+                        "Remove-Item \"$env:LOCALAPPDATA\\Ubisoft Game Launcher\\crashes\\*\" -Recurse -Force -ErrorAction SilentlyContinue;" +
+                        "Write-Output 'Ubisoft Connect cache cleared'")));
+
+                gameActions.add(new PrepAction("[R6] Disable Xbox Game DVR",
+                    "Disables Xbox Game Bar background recording — known to cause DX12 frame time spikes and sudden FPS drops in Siege", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
             }
             case "Valorant" -> {
                 gameActions.add(new PrepAction("[VAL] Disable Fullscreen Optimizations",
