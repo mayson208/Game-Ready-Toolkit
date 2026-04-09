@@ -454,6 +454,14 @@ public class GameSessionPrepApp extends Application {
 
         tile.getChildren().addAll(header, divider);
 
+        // Network warning label
+        if (category.equals("Network")) {
+            Label warn = new Label("⚠  USE AT YOUR OWN RISK");
+            warn.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 10px; " +
+                          "-fx-font-family: Consolas; -fx-font-weight: bold;");
+            tile.getChildren().add(warn);
+        }
+
         for (PrepAction action : actions) {
             String prefix = action.getCategory().equals("Game") ? "game_" :
                             restoreMode ? "restore_" : "prep_";
@@ -467,7 +475,20 @@ public class GameSessionPrepApp extends Application {
                 "-fx-font-family: Consolas; -fx-mark-color: " + color + "; " +
                 "-fx-focus-color: " + color + ";");
 
-            Tooltip tip = new Tooltip(action.getDescription());
+            // Status dot: green=applied, grey=not applied, dim=unknown
+            Circle statusDot = new Circle(4);
+            Boolean applied = action.checkApplied();
+            updateStatusDot(statusDot, applied);
+
+            Tooltip dotTip = new Tooltip(applied == null ? "Status unknown" :
+                applied ? "Already applied" : "Not yet applied");
+            dotTip.setStyle("-fx-font-size: 10px; -fx-font-family: Consolas; " +
+                            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + ";");
+            Tooltip.install(statusDot, dotTip);
+
+            String tipText = action.getDescription() +
+                (action.getCategory().equals("Network") ? "\n\n⚠ Use at your own risk." : "");
+            Tooltip tip = new Tooltip(tipText);
             tip.setStyle("-fx-font-size: 11px; -fx-background-color: " + BG_CARD2 + "; " +
                          "-fx-text-fill: " + color + "; -fx-border-color: " + color + "; " +
                          "-fx-border-width: 2; -fx-font-family: Consolas;");
@@ -475,12 +496,15 @@ public class GameSessionPrepApp extends Application {
             tip.setMaxWidth(300);
             cb.setTooltip(tip);
 
+            HBox row = new HBox(6, statusDot, cb);
+            row.setAlignment(Pos.CENTER_LEFT);
+
             String finalPrefix = prefix;
             cb.selectedProperty().addListener((obs, o, n) -> {
                 action.setSelected(n);
                 PREFS.putBoolean(finalPrefix + action.getName(), n);
             });
-            tile.getChildren().add(cb);
+            tile.getChildren().add(row);
         }
 
         tile.setOnMouseEntered(e -> tile.setStyle(tileHover));
@@ -595,6 +619,8 @@ public class GameSessionPrepApp extends Application {
             writeLog(results);
             writeDebugLog(results);
             showResultDialog(results, stage -> null);
+            // Refresh tiles so status dots update to reflect newly applied settings
+            refreshTiles();
 
             if (failed == 0) {
                 statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
@@ -795,6 +821,17 @@ public class GameSessionPrepApp extends Application {
         }
     }
 
+    // ── Status dot ───────────────────────────────────────────────────────────
+    private void updateStatusDot(Circle dot, Boolean applied) {
+        if (applied == null) {
+            dot.setFill(Color.web("#444444")); // grey = unknown
+        } else if (applied) {
+            dot.setFill(Color.web(GREEN));     // green = applied
+        } else {
+            dot.setFill(Color.web("#555555")); // dark grey = not applied
+        }
+    }
+
     // ── Debug log ─────────────────────────────────────────────────────────────
     private void writeDebugLog(List<PrepActionResult> results) {
         if (debugLog == null) return;
@@ -878,20 +915,32 @@ public class GameSessionPrepApp extends Application {
                 "$existing = powercfg /list | Select-String 'Ultimate';" +
                 "if (-not $existing) { $guid = (powercfg /duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 2>&1); $guid = ($guid -split ' ')[-1].Trim() }" +
                 "else { $guid = ($existing -split ' ')[-1].Trim() };" +
-                "powercfg /setactive $guid; Write-Output \"Ultimate Performance Plan active\"")));
+                "powercfg /setactive $guid; Write-Output \"Ultimate Performance Plan active\""),
+            () -> {
+                var r = runPowerShell("$active = (powercfg /getactivescheme); $active -match 'Ultimate'");
+                return r.isSuccess() && r.getMessage().contains("True");
+            }));
 
         // CPU
         prepActions.add(new PrepAction("Win32PrioritySeparation",
             "Sets foreground app quantum to shortest — game gets more CPU slices, lower input lag", "CPU",
             () -> runPowerShell(
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' " +
-                "-Name 'Win32PrioritySeparation' -Value 26 -Type DWord -Force; Write-Output 'Set to 26 (low latency)'")));
+                "-Name 'Win32PrioritySeparation' -Value 26 -Type DWord -Force; Write-Output 'Set to 26 (low latency)'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl').Win32PrioritySeparation");
+                return r.isSuccess() && r.getMessage().trim().equals("26");
+            }));
 
         prepActions.add(new PrepAction("Disable Paging Executive",
             "Forces kernel code to stay in RAM — reduces DPC latency spikes", "CPU",
             () -> runPowerShell(
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' " +
-                "-Name 'DisablePagingExecutive' -Value 1 -Type DWord -Force; Write-Output 'DisablePagingExecutive enabled'")));
+                "-Name 'DisablePagingExecutive' -Value 1 -Type DWord -Force; Write-Output 'DisablePagingExecutive enabled'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management').DisablePagingExecutive");
+                return r.isSuccess() && r.getMessage().trim().equals("1");
+            }));
 
         prepActions.add(new PrepAction("Set Game CPU Priority",
             "Boosts priority for common game executables via registry", "CPU",
@@ -908,7 +957,11 @@ public class GameSessionPrepApp extends Application {
             "Shifts GPU scheduling to the GPU — lower latency on RTX 20+ / RDNA", "Display",
             () -> runPowerShell(
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' " +
-                "-Name 'HwSchMode' -Value 2 -Type DWord -Force; Write-Output 'HAGS enabled (reboot to apply)'")));
+                "-Name 'HwSchMode' -Value 2 -Type DWord -Force; Write-Output 'HAGS enabled (reboot to apply)'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers').HwSchMode");
+                return r.isSuccess() && r.getMessage().trim().equals("2");
+            }));
 
         prepActions.add(new PrepAction("Set GPU to High Performance",
             "Forces Windows to always use the dedicated GPU", "Display",
@@ -924,7 +977,11 @@ public class GameSessionPrepApp extends Application {
                 "Set-ItemProperty -Path 'HKCU:\\Control Panel\\Mouse' -Name 'MouseSpeed' -Value 0 -Force;" +
                 "Set-ItemProperty -Path 'HKCU:\\Control Panel\\Mouse' -Name 'MouseThreshold1' -Value 0 -Force;" +
                 "Set-ItemProperty -Path 'HKCU:\\Control Panel\\Mouse' -Name 'MouseThreshold2' -Value 0 -Force;" +
-                "Write-Output 'Mouse acceleration disabled'")));
+                "Write-Output 'Mouse acceleration disabled'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKCU:\\Control Panel\\Mouse').MouseSpeed");
+                return r.isSuccess() && r.getMessage().trim().equals("0");
+            }));
 
         prepActions.add(new PrepAction("Check Display Refresh Rate",
             "Reports current vs max monitor Hz — confirm you're at full refresh", "Display",
@@ -940,20 +997,35 @@ public class GameSessionPrepApp extends Application {
                 "Get-ChildItem $base | ForEach-Object {" +
                 "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
                 "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
-                "Write-Output 'Nagle disabled on all interfaces'")));
+                "Write-Output 'Nagle disabled on all interfaces'"),
+            () -> {
+                var r = runPowerShell(
+                    "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                    "$all = Get-ChildItem $base | ForEach-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).TcpAckFrequency };" +
+                    "$all -contains 1");
+                return r.isSuccess() && r.getMessage().trim().equals("True");
+            }));
 
         prepActions.add(new PrepAction("Switch DNS to Cloudflare",
             "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces server connection latency", "Network",
             () -> runPowerShell(
                 "Get-NetAdapter | Where-Object Status -eq 'Up' | ForEach-Object {" +
                 "Set-DnsClientServerAddress -InterfaceIndex $_.ifIndex -ServerAddresses ('1.1.1.1','1.0.0.1');" +
-                "Write-Output \"DNS set on $($_.Name)\" }")));
+                "Write-Output \"DNS set on $($_.Name)\" }"),
+            () -> {
+                var r = runPowerShell("(Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object {$_.ServerAddresses -contains '1.1.1.1'}) -ne $null");
+                return r.isSuccess() && r.getMessage().trim().equals("True");
+            }));
 
         prepActions.add(new PrepAction("Remove Network Throttling",
             "Removes Windows multimedia bandwidth cap on your connection", "Network",
             () -> runPowerShell(
                 "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
-                "-Name 'NetworkThrottlingIndex' -Value 0xffffffff -Type DWord -Force; Write-Output 'NetworkThrottlingIndex removed'")));
+                "-Name 'NetworkThrottlingIndex' -Value 0xffffffff -Type DWord -Force; Write-Output 'NetworkThrottlingIndex removed'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile').NetworkThrottlingIndex");
+                return r.isSuccess() && r.getMessage().trim().equals("-1");
+            }));
 
         prepActions.add(new PrepAction("Flush DNS Cache",
             "Clears stale DNS entries for cleaner server connections", "Network",
@@ -965,36 +1037,64 @@ public class GameSessionPrepApp extends Application {
             () -> runPowerShell(
                 "Stop-Process -Name GameBar -Force -ErrorAction SilentlyContinue;" +
                 "Stop-Process -Name GameBarFTServer -Force -ErrorAction SilentlyContinue;" +
-                "Write-Output 'Xbox Game Bar stopped'")));
+                "Write-Output 'Xbox Game Bar stopped'"),
+            () -> {
+                var r = runPowerShell("(Get-Process -Name GameBar -ErrorAction SilentlyContinue) -eq $null");
+                return r.isSuccess() && r.getMessage().trim().equals("True");
+            }));
 
         prepActions.add(new PrepAction("Enable Game Mode",
             "Dedicates more CPU/GPU resources to the foreground game", "Services",
             () -> runPowerShell(
                 "if (-not (Test-Path 'HKCU:\\Software\\Microsoft\\GameBar')) { New-Item -Path 'HKCU:\\Software\\Microsoft\\GameBar' -Force | Out-Null };" +
                 "Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\GameBar' -Name 'AutoGameModeEnabled' -Value 1 -Type DWord -Force;" +
-                "Write-Output 'Game Mode enabled'")));
+                "Write-Output 'Game Mode enabled'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\GameBar' -ErrorAction SilentlyContinue).AutoGameModeEnabled");
+                return r.isSuccess() && r.getMessage().trim().equals("1");
+            }));
 
         prepActions.add(new PrepAction("Silence Notifications",
             "Blocks all toast popups during gameplay", "Services",
             () -> runPowerShell(
                 "Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings' " +
-                "-Name 'NOC_GLOBAL_SETTING_TOASTS_ENABLED' -Value 0 -Force; Write-Output 'Notifications silenced'")));
+                "-Name 'NOC_GLOBAL_SETTING_TOASTS_ENABLED' -Value 0 -Force; Write-Output 'Notifications silenced'"),
+            () -> {
+                var r = runPowerShell("(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings' -ErrorAction SilentlyContinue).NOC_GLOBAL_SETTING_TOASTS_ENABLED");
+                return r.isSuccess() && r.getMessage().trim().equals("0");
+            }));
 
         prepActions.add(new PrepAction("Stop Windows Search Indexer",
             "Pauses background disk indexing during gameplay", "Services",
-            () -> runPowerShell("Stop-Service -Name WSearch -Force -ErrorAction SilentlyContinue; Write-Output 'Stopped'")));
+            () -> runPowerShell("Stop-Service -Name WSearch -Force -ErrorAction SilentlyContinue; Write-Output 'Stopped'"),
+            () -> {
+                var r = runPowerShell("(Get-Service -Name WSearch -ErrorAction SilentlyContinue).Status");
+                return r.isSuccess() && r.getMessage().trim().equals("Stopped");
+            }));
 
         prepActions.add(new PrepAction("Pause Windows Update",
             "Prevents wuauserv from stealing bandwidth mid-session", "Services",
-            () -> runPowerShell("Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue; Write-Output 'Stopped'")));
+            () -> runPowerShell("Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue; Write-Output 'Stopped'"),
+            () -> {
+                var r = runPowerShell("(Get-Service -Name wuauserv -ErrorAction SilentlyContinue).Status");
+                return r.isSuccess() && r.getMessage().trim().equals("Stopped");
+            }));
 
         prepActions.add(new PrepAction("Stop SysMain (Superfetch)",
             "On SSDs, Superfetch burns disk/RAM for no benefit during gaming", "Services",
-            () -> runPowerShell("Stop-Service -Name SysMain -Force -ErrorAction SilentlyContinue; Write-Output 'SysMain stopped'")));
+            () -> runPowerShell("Stop-Service -Name SysMain -Force -ErrorAction SilentlyContinue; Write-Output 'SysMain stopped'"),
+            () -> {
+                var r = runPowerShell("(Get-Service -Name SysMain -ErrorAction SilentlyContinue).Status");
+                return r.isSuccess() && r.getMessage().trim().equals("Stopped");
+            }));
 
         prepActions.add(new PrepAction("Stop DiagTrack (Telemetry)",
             "Stops Windows telemetry waking up and consuming CPU during your session", "Services",
-            () -> runPowerShell("Stop-Service -Name DiagTrack -Force -ErrorAction SilentlyContinue; Write-Output 'DiagTrack stopped'")));
+            () -> runPowerShell("Stop-Service -Name DiagTrack -Force -ErrorAction SilentlyContinue; Write-Output 'DiagTrack stopped'"),
+            () -> {
+                var r = runPowerShell("(Get-Service -Name DiagTrack -ErrorAction SilentlyContinue).Status");
+                return r.isSuccess() && r.getMessage().trim().equals("Stopped");
+            }));
 
         prepActions.add(new PrepAction("Pause OneDrive Sync",
             "Frees bandwidth and CPU from background cloud uploads", "Services",
