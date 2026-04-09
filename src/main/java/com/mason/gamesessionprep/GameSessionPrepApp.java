@@ -35,29 +35,29 @@ import java.util.stream.Collectors;
 
 public class GameSessionPrepApp extends Application {
 
-    // ── Theme ─────────────────────────────────────────────────────────────────
-    private static final String BG       = "#0a0a0a";
-    private static final String BG_CARD  = "#111111";
-    private static final String BG_CARD2 = "#181818";
-    private static final String BORDER   = "#222222";
-    private static final String TEXT     = "#f1f5f9";
-    private static final String TEXT_DIM = "#4a5568";
-    private static final String PURPLE   = "#7c3aed";
-    private static final String CYAN     = "#06b6d4";
-    private static final String GREEN    = "#22c55e";
-    private static final String RED      = "#ef4444";
-    private static final String AMBER    = "#f59e0b";
-    private static final String PINK     = "#ec4899";
+    // ── Theme — Retro 80s Synthwave ───────────────────────────────────────────
+    private static final String BG       = "#0d0015";
+    private static final String BG_CARD  = "#120028";
+    private static final String BG_CARD2 = "#1a003a";
+    private static final String BORDER   = "#ff00cc";
+    private static final String TEXT     = "#ffffff";
+    private static final String TEXT_DIM = "#cc88ff";
+    private static final String PURPLE   = "#cc00ff";
+    private static final String CYAN     = "#00ffff";
+    private static final String GREEN    = "#39ff14";
+    private static final String RED      = "#ff0055";
+    private static final String AMBER    = "#ffff00";
+    private static final String PINK     = "#ff00cc";
 
     // Category → accent color
     private static final Map<String, String> CAT_COLOR = Map.of(
-        "Power",    AMBER,
-        "CPU",      RED,
-        "Network",  CYAN,
-        "Display",  PURPLE,
-        "Services", GREEN,
-        "Memory",   PINK,
-        "Game",     "#7ee787"
+        "Power",    "#ffff00",
+        "CPU",      "#ff00cc",
+        "Network",  "#00ffff",
+        "Display",  "#cc00ff",
+        "Services", "#39ff14",
+        "Memory",   "#ff6600",
+        "Game",     "#00ffff"
     );
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -132,13 +132,15 @@ public class GameSessionPrepApp extends Application {
 
         // ── ROOT ──────────────────────────────────────────────────────────────
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: " + BG + ";");
+        root.setStyle(
+            "-fx-background-color: " + BG + "; " +
+            "-fx-border-color: " + PINK + "; -fx-border-width: 3;");
 
         // ── TOP BAR ───────────────────────────────────────────────────────────
         root.setTop(buildTopBar());
 
         // ── CENTER: scrollable tile grid ──────────────────────────────────────
-        tilesContainer = new VBox(12);
+        tilesContainer = new VBox(14);
         tilesContainer.setPadding(new Insets(16));
         tilesContainer.setStyle("-fx-background-color: " + BG + ";");
 
@@ -155,9 +157,9 @@ public class GameSessionPrepApp extends Application {
         // ── BOTTOM BAR ────────────────────────────────────────────────────────
         root.setBottom(buildBottomBar(stage));
 
-        Scene scene = new Scene(root, 760, 680);
-        stage.setTitle("Game Ready Toolkit");
-        stage.setMinWidth(600);
+        Scene scene = new Scene(root, 780, 700);
+        stage.setTitle("◈ GAME READY TOOLKIT ◈");
+        stage.setMinWidth(620);
         stage.setScene(scene);
         stage.show();
 
@@ -167,42 +169,42 @@ public class GameSessionPrepApp extends Application {
     // ── Top bar ───────────────────────────────────────────────────────────────
     private VBox buildTopBar() {
         // Logo / title
-        Label logo = new Label("⚡");
-        logo.setStyle("-fx-font-size: 22px;");
-
         Label title = new Label("GAME READY");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                       "-fx-text-fill: " + TEXT + ";");
+        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
+                       "-fx-text-fill: " + CYAN + "; " +
+                       "-fx-effect: dropshadow(gaussian, " + CYAN + ", 12, 0.8, 0, 0);");
 
         Label subtitle = new Label("TOOLKIT");
-        subtitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-text-fill: " + PURPLE + ";");
+        subtitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
+                          "-fx-text-fill: " + PINK + "; " +
+                          "-fx-effect: dropshadow(gaussian, " + PINK + ", 12, 0.8, 0, 0);");
 
-        HBox logoBox = new HBox(6, logo, title, subtitle);
+        HBox logoBox = new HBox(8, title, subtitle);
         logoBox.setAlignment(Pos.CENTER_LEFT);
 
         // Timer
         timerLabel = new Label();
         timerLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 12px; " +
-                            "-fx-font-family: Consolas; -fx-font-weight: bold;");
+                            "-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                            "-fx-effect: dropshadow(gaussian, " + GREEN + ", 8, 0.6, 0, 0);");
         timerLabel.setVisible(false);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Game selector
-        Label gameLabel = new Label("GAME");
-        gameLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 10px; " +
-                           "-fx-font-family: Consolas;");
+        Label gameLabel = new Label("► SELECT GAME");
+        gameLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 10px; " +
+                           "-fx-font-family: Consolas; -fx-font-weight: bold;");
 
         ComboBox<String> gameCombo = new ComboBox<>();
         gameCombo.getItems().addAll(GAME_PROFILES.keySet());
         gameCombo.setValue(PREFS.get("selected_game", "General"));
         selectedGame = gameCombo.getValue();
         gameCombo.setStyle(
-            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + "; " +
-            "-fx-border-color: " + PURPLE + "66; -fx-border-radius: 6; -fx-background-radius: 6; " +
-            "-fx-font-size: 13px; -fx-font-family: Consolas; -fx-pref-width: 200px;");
+            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + CYAN + "; " +
+            "-fx-border-color: " + CYAN + "; -fx-border-width: 2; " +
+            "-fx-font-size: 12px; -fx-font-family: Consolas; -fx-font-weight: bold; -fx-pref-width: 210px;");
 
         gameCombo.setOnAction(e -> {
             selectedGame = gameCombo.getValue();
@@ -210,25 +212,27 @@ public class GameSessionPrepApp extends Application {
             buildGameActions();
             refreshTiles();
             if (gameDescLabel != null)
-                gameDescLabel.setText(GAME_PROFILES.getOrDefault(selectedGame, ""));
+                gameDescLabel.setText("► " + GAME_PROFILES.getOrDefault(selectedGame, ""));
         });
 
-        VBox gamePicker = new VBox(2, gameLabel, gameCombo);
+        VBox gamePicker = new VBox(3, gameLabel, gameCombo);
         gamePicker.setAlignment(Pos.CENTER_LEFT);
 
         HBox mainRow = new HBox(16, logoBox, spacer, timerLabel, gamePicker);
         mainRow.setAlignment(Pos.CENTER_LEFT);
-        mainRow.setPadding(new Insets(14, 20, 8, 20));
+        mainRow.setPadding(new Insets(16, 20, 8, 20));
 
         // Game description strip
-        gameDescLabel = new Label(GAME_PROFILES.getOrDefault(selectedGame, ""));
+        gameDescLabel = new Label("► " + GAME_PROFILES.getOrDefault(selectedGame, ""));
         gameDescLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 10px; " +
                                "-fx-font-family: Consolas; -fx-padding: 0 20 0 20;");
 
         // Sys info strip
-        sysInfoLabel = new Label("  CPU: --   RAM: --");
-        sysInfoLabel.setStyle("-fx-text-fill: " + CYAN + "99; -fx-font-size: 10px; " +
-                              "-fx-font-family: Consolas; -fx-padding: 0 20 6 20;");
+        sysInfoLabel = new Label("CPU: --   RAM: --");
+        sysInfoLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 10px; " +
+                              "-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                              "-fx-padding: 0 20 8 20; " +
+                              "-fx-effect: dropshadow(gaussian, " + GREEN + ", 6, 0.5, 0, 0);");
         startSysInfoUpdater();
 
         HBox bottomStrip = new HBox();
@@ -237,9 +241,10 @@ public class GameSessionPrepApp extends Application {
         bottomStrip.setMaxWidth(Double.MAX_VALUE);
 
         VBox topBar = new VBox(0, mainRow, bottomStrip);
-        topBar.setStyle("-fx-background-color: " + BG_CARD + "; " +
-                        "-fx-border-color: " + BORDER + "; " +
-                        "-fx-border-width: 0 0 1 0;");
+        topBar.setStyle(
+            "-fx-background-color: " + BG_CARD + "; " +
+            "-fx-border-color: " + PINK + "; " +
+            "-fx-border-width: 0 0 3 0;");
         return topBar;
     }
 
@@ -307,16 +312,20 @@ public class GameSessionPrepApp extends Application {
         progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(Double.MAX_VALUE);
         progressBar.setVisible(false);
-        progressBar.setStyle("-fx-accent: " + PURPLE + "; -fx-background-color: " + BG_CARD2 + ";");
+        progressBar.setStyle("-fx-accent: " + CYAN + "; -fx-background-color: " + BG_CARD2 + "; " +
+                             "-fx-border-color: " + CYAN + "; -fx-border-width: 1;");
 
         statusLabel = new Label();
         statusLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 11px; " +
                              "-fx-font-family: Consolas;");
 
-        VBox bottom = new VBox(10, new Separator(), btnRow, progressBar, statusLabel);
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: " + PINK + "; -fx-opacity: 0.8;");
+
+        VBox bottom = new VBox(10, sep, btnRow, progressBar, statusLabel);
         bottom.setPadding(new Insets(12, 20, 16, 20));
         bottom.setStyle("-fx-background-color: " + BG_CARD + "; " +
-                        "-fx-border-color: " + BORDER + "; -fx-border-width: 1 0 0 0;");
+                        "-fx-border-color: " + PINK + "; -fx-border-width: 3 0 0 0;");
         return bottom;
     }
 
@@ -367,25 +376,33 @@ public class GameSessionPrepApp extends Application {
 
     private VBox buildCategoryTile(String category, List<PrepAction> actions) {
         String color = CAT_COLOR.getOrDefault(category, PURPLE);
+        String tileBase =
+            "-fx-background-color: " + BG_CARD + "; " +
+            "-fx-border-color: " + color + "; " +
+            "-fx-border-width: 2; " +
+            "-fx-effect: dropshadow(gaussian, " + color + ", 10, 0.4, 3, 3);";
+        String tileHover =
+            "-fx-background-color: " + BG_CARD2 + "; " +
+            "-fx-border-color: " + color + "; " +
+            "-fx-border-width: 2; " +
+            "-fx-effect: dropshadow(gaussian, " + color + ", 20, 0.8, 3, 3);";
 
         VBox tile = new VBox(8);
         tile.setPadding(new Insets(14));
-        tile.setStyle(
-            "-fx-background-color: " + BG_CARD + "; " +
-            "-fx-border-color: " + color + "44; " +
-            "-fx-border-radius: 10; -fx-background-radius: 10; " +
-            "-fx-border-width: 1;");
+        tile.setStyle(tileBase);
 
         // Tile header
-        Circle dot = new Circle(4, Color.web(color));
-        Label catLabel = new Label(category.toUpperCase());
-        catLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 11px; " +
-                          "-fx-font-weight: bold; -fx-font-family: Consolas;");
+        Circle dot = new Circle(5, Color.web(color));
+        dot.setStyle("-fx-effect: dropshadow(gaussian, " + color + ", 8, 0.9, 0, 0);");
+        Label catLabel = new Label("▌ " + category.toUpperCase());
+        catLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px; " +
+                          "-fx-font-weight: bold; -fx-font-family: Consolas; " +
+                          "-fx-effect: dropshadow(gaussian, " + color + ", 6, 0.6, 0, 0);");
 
         // Pulse animation on dot
-        FadeTransition pulse = new FadeTransition(Duration.millis(1200), dot);
+        FadeTransition pulse = new FadeTransition(Duration.millis(900), dot);
         pulse.setFromValue(1.0);
-        pulse.setToValue(0.3);
+        pulse.setToValue(0.2);
         pulse.setCycleCount(Animation.INDEFINITE);
         pulse.setAutoReverse(true);
         pulse.play();
@@ -394,15 +411,9 @@ public class GameSessionPrepApp extends Application {
         header.setAlignment(Pos.CENTER_LEFT);
 
         Separator divider = new Separator();
-        divider.setStyle("-fx-background-color: " + color + "33; -fx-padding: 0;");
+        divider.setStyle("-fx-background-color: " + color + "; -fx-opacity: 0.4;");
 
         tile.getChildren().addAll(header, divider);
-
-        // Checkboxes
-        String prefPrefix = restoreMode ? "restore_" : (
-            actions.isEmpty() ? "prep_" :
-            (actions.get(0).getCategory().equals("Game") ? "game_" : "prep_")
-        );
 
         for (PrepAction action : actions) {
             String prefix = action.getCategory().equals("Game") ? "game_" :
@@ -414,11 +425,13 @@ public class GameSessionPrepApp extends Application {
             action.setSelected(saved);
             cb.setStyle(
                 "-fx-text-fill: " + TEXT + "; -fx-font-size: 12px; " +
-                "-fx-font-family: Consolas;");
+                "-fx-font-family: Consolas; -fx-mark-color: " + color + "; " +
+                "-fx-focus-color: " + color + ";");
 
             Tooltip tip = new Tooltip(action.getDescription());
-            tip.setStyle("-fx-font-size: 11px; -fx-background-color: #1a1a1a; " +
-                         "-fx-text-fill: " + TEXT + "; -fx-border-color: " + BORDER + ";");
+            tip.setStyle("-fx-font-size: 11px; -fx-background-color: " + BG_CARD2 + "; " +
+                         "-fx-text-fill: " + color + "; -fx-border-color: " + color + "; " +
+                         "-fx-border-width: 2; -fx-font-family: Consolas;");
             tip.setWrapText(true);
             tip.setMaxWidth(300);
             cb.setTooltip(tip);
@@ -431,42 +444,36 @@ public class GameSessionPrepApp extends Application {
             tile.getChildren().add(cb);
         }
 
-        // Hover glow effect
-        tile.setOnMouseEntered(e -> tile.setStyle(
-            "-fx-background-color: " + BG_CARD2 + "; " +
-            "-fx-border-color: " + color + "88; " +
-            "-fx-border-radius: 10; -fx-background-radius: 10; -fx-border-width: 1;"));
-        tile.setOnMouseExited(e -> tile.setStyle(
-            "-fx-background-color: " + BG_CARD + "; " +
-            "-fx-border-color: " + color + "44; " +
-            "-fx-border-radius: 10; -fx-background-radius: 10; -fx-border-width: 1;"));
+        tile.setOnMouseEntered(e -> tile.setStyle(tileHover));
+        tile.setOnMouseExited(e -> tile.setStyle(tileBase));
 
         return tile;
     }
 
     // ── Styles ────────────────────────────────────────────────────────────────
     private String runBtnStyle() {
-        return "-fx-background-color: " + PURPLE + "; -fx-text-fill: white; " +
+        return "-fx-background-color: " + PINK + "; -fx-text-fill: " + BG + "; " +
                "-fx-font-size: 13px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-               "-fx-border-radius: 8; -fx-background-radius: 8; " +
-               "-fx-padding: 8 24; -fx-cursor: hand;";
+               "-fx-border-color: " + PINK + "; -fx-border-width: 2; " +
+               "-fx-padding: 9 26; -fx-cursor: hand; " +
+               "-fx-effect: dropshadow(gaussian, " + PINK + ", 14, 0.7, 4, 4);";
     }
 
     private String toggleStyle(boolean active) {
-        String bg = active ? RED + "22" : BG_CARD2;
-        String border = active ? RED : BORDER;
-        String text = active ? RED : TEXT_DIM;
-        return "-fx-background-color: " + bg + "; -fx-text-fill: " + text + "; " +
-               "-fx-border-color: " + border + "; -fx-border-radius: 6; -fx-background-radius: 6; " +
+        String color = active ? RED : CYAN;
+        return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
+               "-fx-border-color: " + color + "; -fx-border-width: 2; " +
                "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-               "-fx-padding: 6 14; -fx-cursor: hand;";
+               "-fx-padding: 7 14; -fx-cursor: hand; " +
+               "-fx-effect: dropshadow(gaussian, " + color + ", 8, 0.5, 2, 2);";
     }
 
     private String smallBtnStyle(String color) {
-        return "-fx-background-color: " + color + "22; -fx-text-fill: " + color + "; " +
-               "-fx-border-color: " + color + "66; -fx-border-radius: 6; -fx-background-radius: 6; " +
-               "-fx-font-size: 11px; -fx-font-family: Consolas; " +
-               "-fx-padding: 6 12; -fx-cursor: hand;";
+        return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
+               "-fx-border-color: " + color + "; -fx-border-width: 2; " +
+               "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
+               "-fx-padding: 7 14; -fx-cursor: hand; " +
+               "-fx-effect: dropshadow(gaussian, " + color + ", 6, 0.4, 2, 2);";
     }
 
     // ── Select helpers ────────────────────────────────────────────────────────
@@ -584,14 +591,17 @@ public class GameSessionPrepApp extends Application {
         popup.initModality(javafx.stage.Modality.APPLICATION_MODAL);
 
         // Header
+        String mainColor = allGood ? GREEN : AMBER;
         Label icon = new Label(allGood ? "✓" : "⚠");
-        icon.setStyle("-fx-font-size: 36px; -fx-text-fill: " + (allGood ? GREEN : AMBER) + ";");
+        icon.setStyle("-fx-font-size: 42px; -fx-text-fill: " + mainColor + "; " +
+                      "-fx-effect: dropshadow(gaussian, " + mainColor + ", 16, 0.9, 0, 0);");
 
         Label headline = new Label(allGood
-            ? (restoreMode ? "System Restored" : "System Ready to Game")
-            : passed + " succeeded · " + failed + " failed");
+            ? (restoreMode ? "SYSTEM RESTORED" : "SYSTEM READY TO GAME")
+            : passed + " SUCCEEDED · " + failed + " FAILED");
         headline.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-text-fill: " + TEXT + ";");
+                          "-fx-text-fill: " + mainColor + "; " +
+                          "-fx-effect: dropshadow(gaussian, " + mainColor + ", 8, 0.6, 0, 0);");
 
         Label sub = new Label(allGood
             ? "All " + passed + " optimizations applied successfully."
@@ -652,7 +662,8 @@ public class GameSessionPrepApp extends Application {
         VBox root = new VBox(0, headerBox, sep,
                 new javafx.scene.layout.StackPane(scroll) {{ setPadding(new Insets(12, 16, 8, 16)); }},
                 btnRow);
-        root.setStyle("-fx-background-color: " + BG_CARD + ";");
+        root.setStyle("-fx-background-color: " + BG_CARD + "; " +
+                      "-fx-border-color: " + PINK + "; -fx-border-width: 3;");
 
         Scene scene = new Scene(root, 460, 0);
         root.layout();
