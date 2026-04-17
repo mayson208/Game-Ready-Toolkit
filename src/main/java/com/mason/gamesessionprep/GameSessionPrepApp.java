@@ -209,7 +209,7 @@ public class GameSessionPrepApp extends Application {
         Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
         debugTab.setClosable(false);
 
-        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab(), buildBenchmarkTab());
+        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab(), buildBenchmarkTab(), buildCustomActionTab());
         tabPane.setStyle(
             "-fx-background-color: " + BG + "; " +
             "-fx-tab-min-height: 32px; " +
@@ -1878,6 +1878,131 @@ public class GameSessionPrepApp extends Application {
                         "Write-Output 'Background apps closed'")));
             }
         }
+    }
+
+    // ── Custom action builder tab ─────────────────────────────────────────────
+    private Tab buildCustomActionTab() {
+        VBox root = new VBox(14);
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: " + BG + ";");
+
+        Label header = new Label("▌ CUSTOM ACTION BUILDER");
+        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                        "-fx-font-size: 13px; -fx-text-fill: " + PURPLE + ";");
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Action name");
+        nameField.setStyle(inputStyle());
+
+        TextField descField = new TextField();
+        descField.setPromptText("Description (optional)");
+        descField.setStyle(inputStyle());
+
+        TextArea scriptArea = new TextArea();
+        scriptArea.setPromptText("PowerShell script body...");
+        scriptArea.setPrefRowCount(5);
+        scriptArea.setWrapText(true);
+        scriptArea.setStyle(
+            "-fx-control-inner-background: " + BG_CARD2 + "; -fx-text-fill: " + GREEN + "; " +
+            "-fx-prompt-text-fill: " + TEXT_DIM + "; -fx-font-family: Consolas; -fx-font-size: 11px; " +
+            "-fx-border-color: " + PURPLE + "; -fx-border-width: 1;");
+
+        Button addBtn = new Button("+ ADD ACTION");
+        addBtn.setStyle(smallBtnStyle(PURPLE));
+        addBtn.setOnAction(e -> {
+            String n = nameField.getText().trim();
+            String d = descField.getText().trim();
+            String s = scriptArea.getText().trim();
+            if (n.isEmpty() || s.isEmpty()) {
+                statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                statusLabel.setText("⚠ Name and script are required.");
+                return;
+            }
+            String desc = d.isEmpty() ? "Custom action" : d;
+            customActions.add(new PrepAction(n, desc, "Game", () -> runPowerShell(s)));
+            nameField.clear(); descField.clear(); scriptArea.clear();
+            refreshCustomActionList();
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ Custom action added: " + n);
+        });
+
+        VBox form = new VBox(6,
+            fieldLabel("NAME"), nameField,
+            fieldLabel("DESCRIPTION"), descField,
+            fieldLabel("POWERSHELL SCRIPT"), scriptArea,
+            addBtn);
+        form.setPadding(new Insets(12));
+        form.setStyle("-fx-background-color: " + BG_CARD + "; " +
+                      "-fx-border-color: " + PURPLE + "; -fx-border-width: 2;");
+
+        Label listHeader = new Label("▌ SAVED CUSTOM ACTIONS");
+        listHeader.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; " +
+                            "-fx-font-weight: bold; -fx-text-fill: " + TEXT_DIM + ";");
+
+        customActionListBox = new VBox(4);
+        refreshCustomActionList();
+
+        root.getChildren().addAll(header, new Separator(), form, listHeader, customActionListBox);
+
+        ScrollPane sp = new ScrollPane(root);
+        sp.setFitToWidth(true);
+        sp.setStyle("-fx-background: " + BG + "; -fx-background-color: " + BG + "; -fx-border-color: transparent;");
+
+        Tab tab = new Tab("  ◈ CUSTOM  ", sp);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private void refreshCustomActionList() {
+        if (customActionListBox == null) return;
+        customActionListBox.getChildren().clear();
+        if (customActions.isEmpty()) {
+            Label empty = new Label("  No custom actions yet — build one above.");
+            empty.setStyle("-fx-font-family: Consolas; -fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 11px;");
+            customActionListBox.getChildren().add(empty);
+            return;
+        }
+        for (int i = 0; i < customActions.size(); i++) {
+            PrepAction a = customActions.get(i);
+            Label lbl = new Label("▸ " + a.getName());
+            lbl.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + TEXT + ";");
+            final int idx = i;
+            Button del = new Button("✕");
+            del.setStyle("-fx-background-color: transparent; -fx-text-fill: " + RED + "; " +
+                         "-fx-font-family: Consolas; -fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 2 6;");
+            del.setOnAction(e -> { customActions.remove(idx); refreshCustomActionList(); });
+            Button run = new Button("▶");
+            run.setStyle("-fx-background-color: transparent; -fx-text-fill: " + GREEN + "; " +
+                         "-fx-font-family: Consolas; -fx-cursor: hand; -fx-padding: 2 6;");
+            run.setOnAction(e -> {
+                PrepActionResult r = a.execute();
+                statusLabel.setStyle("-fx-text-fill: " + (r.isSuccess() ? GREEN : RED) +
+                                     "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                statusLabel.setText((r.isSuccess() ? "✓ " : "✗ ") + a.getName() + ": " + r.getMessage());
+            });
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            HBox row = new HBox(8, lbl, spacer, run, del);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(6, 10, 6, 10));
+            row.setStyle("-fx-background-color: " + BG_CARD + "; " +
+                         "-fx-border-color: transparent transparent " + PURPLE + " transparent; " +
+                         "-fx-border-width: 0 0 1 0;");
+            customActionListBox.getChildren().add(row);
+        }
+    }
+
+    private String inputStyle() {
+        return "-fx-control-inner-background: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + "; " +
+               "-fx-prompt-text-fill: " + TEXT_DIM + "; -fx-font-family: Consolas; -fx-font-size: 12px; " +
+               "-fx-border-color: " + PURPLE + "; -fx-border-width: 1;";
+    }
+
+    private Label fieldLabel(String text) {
+        Label l = new Label(text);
+        l.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; " +
+                   "-fx-text-fill: " + TEXT_DIM + "; -fx-font-weight: bold;");
+        return l;
     }
 
     // ── Profile import / export ───────────────────────────────────────────────
