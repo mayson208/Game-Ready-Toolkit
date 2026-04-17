@@ -1435,8 +1435,69 @@ public class GameSessionPrepApp extends Application {
             }
             case "CS2" -> {
                 gameActions.add(new PrepAction("[CS2] Disable Fullscreen Optimizations",
-                    "Exclusive fullscreen gives lower latency in Source 2", "Game",
+                    "Exclusive fullscreen — bypasses DWM for lower input latency in Source 2", "Game",
                     () -> runPowerShell("$loc = (Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App 730' -ErrorAction SilentlyContinue).InstallLocation; if ($loc) { $exe = \"$loc\\game\\bin\\win64\\cs2.exe\"; if (Test-Path $exe) { $reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers'; if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null }; Set-ItemProperty -Path $reg -Name $exe -Value 'DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; Write-Output 'FSO disabled' } } else { Write-Output 'CS2 not found via Steam registry' }")));
+
+                gameActions.add(new PrepAction("[CS2] SystemResponsiveness = 0",
+                    "Allows CS2 to use 100% of CPU scheduling — removes default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[CS2] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[CS2] Set CS2 CPU Priority",
+                    "Boosts cs2.exe to High CPU priority — run while game is open for immediate effect", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'cs2' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) { $proc.PriorityClass = 'High'; Write-Output 'CS2 set to High CPU priority' }" +
+                        "else { Write-Output 'CS2 not running — launch game first then re-run' }")));
+
+                gameActions.add(new PrepAction("[CS2] Disable Xbox Game DVR",
+                    "Disables background recording — known to cause Source 2 frame time spikes", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
+
+                gameActions.add(new PrepAction("[CS2] Clear CS2 Shader Cache",
+                    "Removes stale DX11 shader cache — fixes first-session hitching on maps", "Game",
+                    () -> runPowerShell(
+                        "$loc = (Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App 730' -ErrorAction SilentlyContinue).InstallLocation;" +
+                        "if ($loc) { Remove-Item \"$loc\\game\\csgo\\shadercache\\*\" -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'CS2 shader cache cleared' }" +
+                        "else { Write-Output 'CS2 install path not found via Steam registry' }")));
+
+                gameActions.add(new PrepAction("[CS2] Disable Nagle's Algorithm",
+                    "Removes TCP packet batching on all adapters — reduces ping spikes on Valve servers", "Game",
+                    () -> runPowerShell(
+                        "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "Get-ChildItem $base | ForEach-Object {" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Nagle disabled on all interfaces'")));
+
+                gameActions.add(new PrepAction("[CS2] Set DNS to Cloudflare",
+                    "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces Valve server connection latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[CS2] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM for Source 2 rendering", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
             }
             case "Fortnite" -> {
                 gameActions.add(new PrepAction("[FN] Clear Epic Games Cache",
