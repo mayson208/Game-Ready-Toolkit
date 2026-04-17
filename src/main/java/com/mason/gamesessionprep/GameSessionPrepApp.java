@@ -238,6 +238,7 @@ public class GameSessionPrepApp extends Application {
         stage.show();
 
         setupTrayIcon(stage);
+        checkForUpdates();
     }
 
     // ── Top bar ───────────────────────────────────────────────────────────────
@@ -1860,5 +1861,38 @@ public class GameSessionPrepApp extends Application {
                         "Write-Output 'Background apps closed'")));
             }
         }
+    }
+
+    // ── Auto-update check ─────────────────────────────────────────────────────
+    private void checkForUpdates() {
+        Thread t = new Thread(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(GITHUB_RELEASES_URL))
+                    .header("Accept", "application/vnd.github+json")
+                    .build();
+                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+                Matcher m = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").matcher(resp.body());
+                if (m.find()) {
+                    String latest = m.group(1);
+                    if (!latest.equals(VERSION)) {
+                        Platform.runLater(() -> showUpdateDialog(latest));
+                    }
+                }
+            } catch (Exception ignored) {}
+        }, "update-check");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void showUpdateDialog(String latest) {
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle("Update Available");
+        a.setHeaderText("New version available: " + latest);
+        a.setContentText("You are running " + VERSION + ".\nVisit GitHub to download the latest release.");
+        a.getDialogPane().setStyle(
+            "-fx-background-color: " + BG_CARD + "; -fx-border-color: " + PINK + "; -fx-border-width: 2;");
+        a.showAndWait();
     }
 }
