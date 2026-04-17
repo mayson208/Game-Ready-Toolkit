@@ -1425,13 +1425,138 @@ public class GameSessionPrepApp extends Application {
             }
             case "Apex Legends" -> {
                 gameActions.add(new PrepAction("[Apex] Clear Shader Cache",
-                    "Removes stale shader cache that causes hitching", "Game",
+                    "Removes stale Respawn shader cache — fixes hitching on first match of session", "Game",
                     () -> runPowerShell("Remove-Item \"$env:LOCALAPPDATA\\Temp\\Respawn\\*\" -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Apex cache cleared'")));
+
+                gameActions.add(new PrepAction("[Apex] SystemResponsiveness = 0",
+                    "Allows Apex to use 100% of CPU scheduling — removes default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[Apex] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[Apex] Set Apex CPU Priority",
+                    "Boosts r5apex.exe to High CPU priority — run while game is open for immediate effect", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'r5apex' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) { $proc.PriorityClass = 'High'; Write-Output 'Apex set to High CPU priority' }" +
+                        "else { Write-Output 'Apex not running — launch game first then re-run' }")));
+
+                gameActions.add(new PrepAction("[Apex] Disable Xbox Game DVR",
+                    "Disables background recording — causes frame time spikes in Apex Legends", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
+
+                gameActions.add(new PrepAction("[Apex] Kill EA App Background",
+                    "Stops EA App background services — frees CPU and RAM during gameplay", "Game",
+                    () -> runPowerShell(
+                        "Stop-Process -Name 'EABackgroundService' -Force -ErrorAction SilentlyContinue;" +
+                        "Stop-Process -Name 'EADesktop' -Force -ErrorAction SilentlyContinue;" +
+                        "Stop-Process -Name 'EALauncher' -Force -ErrorAction SilentlyContinue;" +
+                        "Write-Output 'EA App background processes stopped'")));
+
+                gameActions.add(new PrepAction("[Apex] Disable Nagle's Algorithm",
+                    "Removes TCP packet batching on all adapters — reduces ping spikes on EA servers", "Game",
+                    () -> runPowerShell(
+                        "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "Get-ChildItem $base | ForEach-Object {" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Nagle disabled on all interfaces'")));
+
+                gameActions.add(new PrepAction("[Apex] Set DNS to Cloudflare",
+                    "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces EA server connection latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[Apex] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM for Apex rendering", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
             }
             case "Warzone / MW3" -> {
                 gameActions.add(new PrepAction("[COD] Kill Battle.net Background",
-                    "Stop Battle.net update services to free resources", "Game",
+                    "Stops Battle.net launcher and update agent — frees RAM and CPU for Warzone/MW3", "Game",
                     () -> runPowerShell("Stop-Process -Name 'Battle.net' -Force -ErrorAction SilentlyContinue; Stop-Service -Name 'BattlenetUpdateAgent' -Force -ErrorAction SilentlyContinue; Write-Output 'Battle.net stopped'")));
+
+                gameActions.add(new PrepAction("[COD] SystemResponsiveness = 0",
+                    "Allows COD engine to use 100% of CPU scheduling — removes default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[COD] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[COD] Disable Fullscreen Optimizations",
+                    "True exclusive fullscreen for cod.exe — lower input latency vs Fullscreen Windowed", "Game",
+                    () -> runPowerShell(
+                        "$reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers';" +
+                        "if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null };" +
+                        "$paths = @(\"$env:ProgramFiles\\Call of Duty\\cod.exe\", \"$env:ProgramFiles(x86)\\Call of Duty\\cod.exe\");" +
+                        "foreach ($exe in $paths) { if (Test-Path $exe) { Set-ItemProperty -Path $reg -Name $exe -Value 'DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; Write-Output \"FSO disabled: $exe\" } };" +
+                        "Write-Output 'Done'")));
+
+                gameActions.add(new PrepAction("[COD] Disable Xbox Game DVR",
+                    "Disables background recording — causes DX12 frame time spikes in Warzone/MW3", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
+
+                gameActions.add(new PrepAction("[COD] Clear COD Shader Cache",
+                    "Clears stale COD shader cache — fixes stutter on first load of maps", "Game",
+                    () -> runPowerShell(
+                        "Remove-Item \"$env:LOCALAPPDATA\\Temp\\Activision\\*\" -Recurse -Force -ErrorAction SilentlyContinue;" +
+                        "Remove-Item \"$env:LOCALAPPDATA\\Blizzard Entertainment\\Battle.net\\Cache\\*\" -Recurse -Force -ErrorAction SilentlyContinue;" +
+                        "Write-Output 'COD/Battle.net cache cleared'")));
+
+                gameActions.add(new PrepAction("[COD] Disable Nagle's Algorithm",
+                    "Removes TCP packet batching on all adapters — reduces ping spikes on Activision servers", "Game",
+                    () -> runPowerShell(
+                        "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "Get-ChildItem $base | ForEach-Object {" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Nagle disabled on all interfaces'")));
+
+                gameActions.add(new PrepAction("[COD] Set DNS to Cloudflare",
+                    "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces Activision server lookup latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[COD] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM for COD engine", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
             }
             case "CS2" -> {
                 gameActions.add(new PrepAction("[CS2] Disable Fullscreen Optimizations",
@@ -1501,13 +1626,139 @@ public class GameSessionPrepApp extends Application {
             }
             case "Fortnite" -> {
                 gameActions.add(new PrepAction("[FN] Clear Epic Games Cache",
-                    "Removes Epic cache files that cause shader stutter on load", "Game",
+                    "Removes Epic launcher web cache — fixes shader stutter on Fortnite load", "Game",
                     () -> runPowerShell("Remove-Item \"$env:LOCALAPPDATA\\EpicGamesLauncher\\Saved\\webcache*\" -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Epic cache cleared'")));
+
+                gameActions.add(new PrepAction("[FN] SystemResponsiveness = 0",
+                    "Allows Fortnite UE5 to use 100% of CPU scheduling — removes default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[FN] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[FN] Disable Fullscreen Optimizations",
+                    "True exclusive fullscreen for Fortnite — bypasses DWM compositor for lower latency", "Game",
+                    () -> runPowerShell(
+                        "$reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers';" +
+                        "if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null };" +
+                        "$exe = \"$env:LOCALAPPDATA\\FortniteGame\\Binaries\\Win64\\FortniteClient-Win64-Shipping.exe\";" +
+                        "if (Test-Path $exe) { Set-ItemProperty -Path $reg -Name $exe -Value 'DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; Write-Output \"FSO disabled: $exe\" }" +
+                        "else { Write-Output 'Fortnite exe not found in default path — install may be in a custom location' }")));
+
+                gameActions.add(new PrepAction("[FN] Set Fortnite CPU Priority",
+                    "Boosts FortniteClient-Win64-Shipping.exe to High CPU priority — run while game is open", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'FortniteClient-Win64-Shipping' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) { $proc.PriorityClass = 'High'; Write-Output 'Fortnite set to High CPU priority' }" +
+                        "else { Write-Output 'Fortnite not running — launch game first then re-run' }")));
+
+                gameActions.add(new PrepAction("[FN] Disable Xbox Game DVR",
+                    "Disables background recording — causes UE5 frame time spikes in Fortnite", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
+
+                gameActions.add(new PrepAction("[FN] Disable Nagle's Algorithm",
+                    "Removes TCP packet batching on all adapters — reduces ping spikes on Epic servers", "Game",
+                    () -> runPowerShell(
+                        "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "Get-ChildItem $base | ForEach-Object {" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Nagle disabled on all interfaces'")));
+
+                gameActions.add(new PrepAction("[FN] Set DNS to Cloudflare",
+                    "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces Epic server connection latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[FN] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM for Fortnite UE5", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
             }
             case "Overwatch 2" -> {
                 gameActions.add(new PrepAction("[OW2] Kill Battle.net Background",
-                    "Free resources from Battle.net updater during your session", "Game",
+                    "Stops Battle.net launcher and update agent — frees RAM and CPU for Overwatch 2", "Game",
                     () -> runPowerShell("Stop-Process -Name 'Battle.net' -Force -ErrorAction SilentlyContinue; Stop-Service -Name 'BattlenetUpdateAgent' -Force -ErrorAction SilentlyContinue; Write-Output 'Battle.net stopped'")));
+
+                gameActions.add(new PrepAction("[OW2] SystemResponsiveness = 0",
+                    "Allows Overwatch 2 to use 100% of CPU scheduling — removes default 20% multimedia reservation", "Game",
+                    () -> runPowerShell(
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' " +
+                        "-Name 'SystemResponsiveness' -Value 0 -Type DWord -Force; Write-Output 'SystemResponsiveness set to 0'")));
+
+                gameActions.add(new PrepAction("[OW2] Boost Games Task Priority",
+                    "Sets GPU Priority 8, CPU Priority 6, Scheduling=High for all games in Windows scheduler", "Game",
+                    () -> runPowerShell(
+                        "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games';" +
+                        "if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null };" +
+                        "Set-ItemProperty -Path $p -Name 'GPU Priority' -Value 8 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Priority' -Value 6 -Type DWord -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'Scheduling Category' -Value 'High' -Type String -Force;" +
+                        "Set-ItemProperty -Path $p -Name 'SFIO Priority' -Value 'High' -Type String -Force;" +
+                        "Write-Output 'Games task priority boosted'")));
+
+                gameActions.add(new PrepAction("[OW2] Set Overwatch CPU Priority",
+                    "Boosts Overwatch.exe to High CPU priority — run while game is open for immediate effect", "Game",
+                    () -> runPowerShell(
+                        "$proc = Get-Process -Name 'Overwatch' -ErrorAction SilentlyContinue;" +
+                        "if ($proc) { $proc.PriorityClass = 'High'; Write-Output 'Overwatch 2 set to High CPU priority' }" +
+                        "else { Write-Output 'Overwatch 2 not running — launch game first then re-run' }")));
+
+                gameActions.add(new PrepAction("[OW2] Disable Fullscreen Optimizations",
+                    "True exclusive fullscreen for Overwatch.exe — lower input latency vs Fullscreen Windowed", "Game",
+                    () -> runPowerShell(
+                        "$reg = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers';" +
+                        "if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null };" +
+                        "$exe = \"$env:ProgramFiles(x86)\\Overwatch\\_retail_\\Overwatch.exe\";" +
+                        "if (Test-Path $exe) { Set-ItemProperty -Path $reg -Name $exe -Value 'DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force; Write-Output \"FSO disabled: $exe\" }" +
+                        "else { Write-Output 'Overwatch.exe not found in default path — apply manually via Properties > Compatibility' }")));
+
+                gameActions.add(new PrepAction("[OW2] Disable Xbox Game DVR",
+                    "Disables background recording — causes frame time spikes in Overwatch 2", "Game",
+                    () -> runPowerShell(
+                        "$p1 = 'HKCU:\\System\\GameConfigStore'; if (-not (Test-Path $p1)) { New-Item $p1 -Force | Out-Null }; Set-ItemProperty -Path $p1 -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force;" +
+                        "$p2 = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR'; if (-not (Test-Path $p2)) { New-Item $p2 -Force | Out-Null }; Set-ItemProperty -Path $p2 -Name 'AllowGameDVR' -Value 0 -Type DWord -Force;" +
+                        "Write-Output 'Xbox Game DVR disabled'")));
+
+                gameActions.add(new PrepAction("[OW2] Disable Nagle's Algorithm",
+                    "Removes TCP packet batching on all adapters — reduces ping spikes on Blizzard servers", "Game",
+                    () -> runPowerShell(
+                        "$base = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces';" +
+                        "Get-ChildItem $base | ForEach-Object {" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue;" +
+                        "Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Nagle disabled on all interfaces'")));
+
+                gameActions.add(new PrepAction("[OW2] Set DNS to Cloudflare",
+                    "1.1.1.1 / 1.0.0.1 — fastest public DNS, reduces Blizzard server connection latency", "Game",
+                    () -> runPowerShell(
+                        "$adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1;" +
+                        "Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ('1.1.1.1','1.0.0.1');" +
+                        "Write-Output \"DNS set to Cloudflare on $($adapter.Name)\"")));
+
+                gameActions.add(new PrepAction("[OW2] Kill Background Resource Hogs",
+                    "Force-closes Chrome, Edge, Teams, Spotify, OneDrive, Discord — frees RAM for Overwatch 2", "Game",
+                    () -> runPowerShell(
+                        "$kill = @('chrome','msedge','firefox','Teams','Spotify','OneDrive','slack','Discord');" +
+                        "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
+                        "Write-Output 'Background apps closed'")));
             }
         }
     }
