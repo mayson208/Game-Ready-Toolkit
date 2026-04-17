@@ -209,7 +209,7 @@ public class GameSessionPrepApp extends Application {
         Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
         debugTab.setClosable(false);
 
-        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab(), buildBenchmarkTab(), buildCustomActionTab());
+        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab(), buildBenchmarkTab(), buildCustomActionTab(), buildAITab());
         tabPane.setStyle(
             "-fx-background-color: " + BG + "; " +
             "-fx-tab-min-height: 32px; " +
@@ -1878,6 +1878,118 @@ public class GameSessionPrepApp extends Application {
                         "Write-Output 'Background apps closed'")));
             }
         }
+    }
+
+    // ── AI recommendations tab ────────────────────────────────────────────────
+    private Tab buildAITab() {
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: " + BG + ";");
+
+        Label header = new Label("▌ AI RECOMMENDATIONS  (Claude API)");
+        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                        "-fx-font-size: 13px; -fx-text-fill: " + PINK + ";");
+
+        Label info = new Label(
+            "Enter your Anthropic API key to get AI-powered, game-specific optimization tips based on your system.");
+        info.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
+        info.setWrapText(true);
+
+        PasswordField apiKeyField = new PasswordField();
+        apiKeyField.setPromptText("sk-ant-api...");
+        apiKeyField.setStyle(inputStyle());
+        String savedKey = PREFS.get("claude_api_key", "");
+        if (!savedKey.isEmpty()) apiKeyField.setText(savedKey);
+        apiKeyField.textProperty().addListener((obs, o, n) -> PREFS.put("claude_api_key", n));
+
+        TextArea outputArea = new TextArea("← Click ANALYZE to get AI recommendations.");
+        outputArea.setEditable(false);
+        outputArea.setWrapText(true);
+        outputArea.setPrefRowCount(18);
+        outputArea.setStyle(
+            "-fx-control-inner-background: #080010; -fx-text-fill: " + PINK + "; " +
+            "-fx-font-family: Consolas; -fx-font-size: 12px; " +
+            "-fx-border-color: " + PINK + "; -fx-border-width: 1;");
+
+        Button analyzeBtn = new Button("⚡  ANALYZE MY SYSTEM");
+        analyzeBtn.setStyle(smallBtnStyle(PINK));
+        analyzeBtn.setOnAction(e -> {
+            String key = apiKeyField.getText().trim();
+            if (key.isEmpty()) {
+                outputArea.setText("⚠ Enter your Anthropic API key first.");
+                return;
+            }
+            analyzeBtn.setDisable(true);
+            outputArea.setText("⟳ Contacting Claude API...");
+            callClaudeAPI(key, outputArea, analyzeBtn);
+        });
+
+        VBox keyRow = new VBox(4, fieldLabel("ANTHROPIC API KEY"), apiKeyField);
+        root.getChildren().addAll(header, new Separator(), info, keyRow, analyzeBtn, outputArea);
+
+        ScrollPane sp = new ScrollPane(root);
+        sp.setFitToWidth(true);
+        sp.setStyle("-fx-background: " + BG + "; -fx-background-color: " + BG + "; -fx-border-color: transparent;");
+
+        Tab tab = new Tab("  ◈ AI TIPS  ", sp);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private void callClaudeAPI(String apiKey, TextArea output, Button btn) {
+        Thread t = new Thread(() -> {
+            try {
+                com.sun.management.OperatingSystemMXBean os =
+                    (com.sun.management.OperatingSystemMXBean)
+                    java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+                double cpu   = os.getCpuLoad() * 100;
+                long totalMb = os.getTotalMemorySize() / (1024 * 1024);
+                String sysCtx = String.format(
+                    "CPU: %.1f%% load, %d cores | RAM: %d MB total | Game profile: %s",
+                    cpu, Runtime.getRuntime().availableProcessors(), totalMb, selectedGame);
+
+                String prompt =
+                    "You are a PC gaming optimization expert. " +
+                    "The user runs Game Ready Toolkit on Windows 11 with profile '" + selectedGame + "'.\n" +
+                    "System snapshot: " + sysCtx + "\n\n" +
+                    "Give 6 concise, actionable recommendations to improve FPS and reduce latency for " +
+                    selectedGame + ". Cover Windows settings, driver config, in-game settings, and hardware tips. " +
+                    "Format as a numbered list. Be specific and practical.";
+
+                String body = "{\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":900," +
+                    "\"messages\":[{\"role\":\"user\",\"content\":\"" + jsonStringLiteral(prompt) + "\"}]}";
+
+                HttpClient client = HttpClient.newHttpClient();
+                HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(CLAUDE_API_URL))
+                    .header("content-type", "application/json")
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", "2023-06-01")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+
+                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+                String respBody = resp.body();
+
+                String text;
+                Matcher m = Pattern.compile("\"text\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").matcher(respBody);
+                if (m.find()) {
+                    text = m.group(1)
+                        .replace("\\n", "\n").replace("\\t", "\t")
+                        .replace("\\\"", "\"").replace("\\\\", "\\");
+                } else {
+                    text = resp.statusCode() != 200
+                        ? "API error " + resp.statusCode() + ":\n" + respBody
+                        : "Could not parse response:\n" + respBody;
+                }
+                String finalText = text;
+                Platform.runLater(() -> { output.setText(finalText); btn.setDisable(false); });
+            } catch (Exception ex) {
+                Platform.runLater(() -> { output.setText("✗ Error: " + ex.getMessage()); btn.setDisable(false); });
+            }
+        }, "claude-api");
+        t.setDaemon(true);
+        t.start();
     }
 
     // ── Custom action builder tab ─────────────────────────────────────────────
