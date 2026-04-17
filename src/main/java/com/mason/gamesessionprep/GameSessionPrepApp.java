@@ -209,7 +209,7 @@ public class GameSessionPrepApp extends Application {
         Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
         debugTab.setClosable(false);
 
-        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab());
+        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab(), buildBenchmarkTab());
         tabPane.setStyle(
             "-fx-background-color: " + BG + "; " +
             "-fx-tab-min-height: 32px; " +
@@ -1860,6 +1860,122 @@ public class GameSessionPrepApp extends Application {
                         "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
                         "Write-Output 'Background apps closed'")));
             }
+        }
+    }
+
+    // ── Before/After benchmark tab ────────────────────────────────────────────
+    private Tab buildBenchmarkTab() {
+        VBox root = new VBox(14);
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: " + BG + ";");
+
+        Label header = new Label("▌ BEFORE / AFTER BENCHMARK");
+        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                        "-fx-text-fill: " + AMBER + ";");
+
+        Label info = new Label(
+            "Capture baseline metrics BEFORE running optimizations, then capture AFTER to compare the delta.");
+        info.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
+        info.setWrapText(true);
+
+        benchmarkResultsBox = new VBox(4);
+
+        Button baselineBtn = new Button("📷  CAPTURE BASELINE");
+        baselineBtn.setStyle(smallBtnStyle(AMBER));
+        Button afterBtn = new Button("📷  CAPTURE AFTER");
+        afterBtn.setStyle(smallBtnStyle(GREEN));
+        Button clearBtn = new Button("CLR");
+        clearBtn.setStyle(smallBtnStyle(TEXT_DIM));
+
+        baselineBtn.setOnAction(e -> {
+            captureMetrics(baselineMetrics);
+            refreshBenchmarkTable();
+            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ Baseline captured.");
+        });
+        afterBtn.setOnAction(e -> {
+            captureMetrics(afterMetrics);
+            refreshBenchmarkTable();
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ After metrics captured.");
+        });
+        clearBtn.setOnAction(e -> {
+            baselineMetrics.clear();
+            afterMetrics.clear();
+            if (benchmarkResultsBox != null) benchmarkResultsBox.getChildren().clear();
+        });
+
+        HBox btnRow = new HBox(10, baselineBtn, afterBtn, clearBtn);
+        root.getChildren().addAll(header, new Separator(), info, btnRow, benchmarkResultsBox);
+
+        ScrollPane sp = new ScrollPane(root);
+        sp.setFitToWidth(true);
+        sp.setStyle("-fx-background: " + BG + "; -fx-background-color: " + BG + "; -fx-border-color: transparent;");
+
+        Tab tab = new Tab("  ◈ BENCHMARK  ", sp);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private void captureMetrics(Map<String, String> target) {
+        target.clear();
+        try {
+            com.sun.management.OperatingSystemMXBean os =
+                (com.sun.management.OperatingSystemMXBean)
+                java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            double cpu = os.getCpuLoad() * 100;
+            long total = os.getTotalMemorySize();
+            long free  = os.getFreeMemorySize();
+            target.put("CPU Usage",  cpu < 0 ? "--" : String.format("%.1f%%", cpu));
+            target.put("RAM Used",   String.format("%d MB / %d MB",
+                (total - free) / (1024*1024), total / (1024*1024)));
+            target.put("CPU Cores",  String.valueOf(Runtime.getRuntime().availableProcessors()));
+            target.put("Timestamp",  LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+            PrepActionResult dr = runPowerShell(
+                "(Get-PSDrive C).Free");
+            if (dr.isSuccess()) {
+                try {
+                    long freeBytes = Long.parseLong(dr.getMessage().trim());
+                    target.put("C: Free Space", String.format("%.1f GB", freeBytes / 1_000_000_000.0));
+                } catch (NumberFormatException ignored) {}
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void refreshBenchmarkTable() {
+        if (benchmarkResultsBox == null) return;
+        benchmarkResultsBox.getChildren().clear();
+
+        Set<String> allKeys = new LinkedHashSet<>();
+        allKeys.addAll(baselineMetrics.keySet());
+        allKeys.addAll(afterMetrics.keySet());
+        if (allKeys.isEmpty()) return;
+
+        HBox hdr = new HBox();
+        hdr.setStyle("-fx-background-color: " + BG_CARD2 + "; -fx-padding: 6 10;");
+        Label c0 = new Label("Metric");
+        c0.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + PURPLE + "; -fx-min-width: 160px;");
+        Label c1 = new Label("Before");
+        c1.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
+        Label c2 = new Label("After");
+        c2.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
+        hdr.getChildren().addAll(c0, c1, c2);
+        benchmarkResultsBox.getChildren().add(hdr);
+
+        for (String key : allKeys) {
+            String before = baselineMetrics.getOrDefault(key, "--");
+            String after  = afterMetrics.getOrDefault(key, "--");
+            HBox rowBox = new HBox();
+            rowBox.setStyle("-fx-padding: 5 10; " +
+                "-fx-border-color: transparent transparent #220044 transparent; -fx-border-width: 0 0 1 0;");
+            Label k = new Label(key);
+            k.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + TEXT + "; -fx-min-width: 160px;");
+            Label b = new Label(before);
+            b.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
+            Label a = new Label(after);
+            a.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
+            rowBox.getChildren().addAll(k, b, a);
+            benchmarkResultsBox.getChildren().add(rowBox);
         }
     }
 
