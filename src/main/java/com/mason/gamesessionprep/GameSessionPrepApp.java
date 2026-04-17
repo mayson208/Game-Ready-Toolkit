@@ -376,6 +376,12 @@ public class GameSessionPrepApp extends Application {
         selAll .setOnAction(e -> setAllSelected(true));
         selNone.setOnAction(e -> setAllSelected(false));
 
+        // Report button
+        reportBtn = new Button("📄 REPORT");
+        reportBtn.setStyle(smallBtnStyle(AMBER));
+        reportBtn.setDisable(true);
+        reportBtn.setOnAction(e -> generateHtmlReport());
+
         // Run button
         Button runBtn = new Button("▶  PREPARE SYSTEM");
         runBtn.setStyle(runBtnStyle());
@@ -384,7 +390,7 @@ public class GameSessionPrepApp extends Application {
         modeToggle.selectedProperty().addListener((obs, o, n) ->
             runBtn.setText(n ? "▶  RESTORE SYSTEM" : "▶  PREPARE SYSTEM"));
 
-        HBox btnRow = new HBox(10, modeToggle, selAll, selNone, new Region(), runBtn);
+        HBox btnRow = new HBox(10, modeToggle, selAll, selNone, new Region(), reportBtn, runBtn);
         HBox.setHgrow(btnRow.getChildren().get(3), Priority.ALWAYS);
         btnRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -655,6 +661,8 @@ public class GameSessionPrepApp extends Application {
             if (!restoreMode && failed == 0) startSessionTimer();
             else if (restoreMode) stopSessionTimer();
 
+            lastResults = results;
+            if (reportBtn != null) reportBtn.setDisable(false);
             writeLog(results);
             writeDebugLog(results);
             showResultDialog(results, stage -> null);
@@ -1860,6 +1868,68 @@ public class GameSessionPrepApp extends Application {
                         "foreach ($p in $kill) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue };" +
                         "Write-Output 'Background apps closed'")));
             }
+        }
+    }
+
+    // ── HTML system report ────────────────────────────────────────────────────
+    private void generateHtmlReport() {
+        if (lastResults.isEmpty()) {
+            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("⚠ No results yet — run PREPARE SYSTEM first.");
+            return;
+        }
+        try {
+            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            long passed = lastResults.stream().filter(PrepActionResult::isSuccess).count();
+            long failed = lastResults.size() - passed;
+
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html><html><head><meta charset='UTF-8'>")
+                .append("<title>Game Ready Toolkit Report</title>")
+                .append("<style>")
+                .append("body{background:#0d0015;color:#fff;font-family:Consolas,monospace;padding:24px;margin:0}")
+                .append("h1{color:#ff00cc;margin-bottom:4px}")
+                .append("h2{color:#00ffff;border-bottom:1px solid #330066;padding-bottom:6px}")
+                .append(".ts{color:#888;font-size:11px;margin-bottom:20px}")
+                .append(".ok{color:#39ff14}.fail{color:#ff0055}.dim{color:#cc88ff;font-size:11px}")
+                .append("table{border-collapse:collapse;width:100%;margin-top:8px}")
+                .append("th{background:#1a003a;color:#cc00ff;padding:9px 12px;text-align:left;font-size:12px}")
+                .append("td{padding:7px 12px;border-bottom:1px solid #220044;font-size:12px}")
+                .append(".summary{background:#120028;border:2px solid #ff00cc;padding:14px 20px;")
+                .append("display:inline-block;margin-bottom:24px;border-radius:4px}")
+                .append("</style></head><body>")
+                .append("<h1>◈ GAME READY TOOLKIT ").append(VERSION).append("</h1>")
+                .append("<p class='ts'>").append(ts).append("  —  Profile: <b>").append(selectedGame).append("</b></p>")
+                .append("<div class='summary'>")
+                .append("<span class='ok'>✓ ").append(passed).append(" passed</span>")
+                .append("&nbsp;&nbsp;&nbsp;")
+                .append("<span class='fail'>✗ ").append(failed).append(" failed</span>")
+                .append("</div>")
+                .append("<h2>Optimization Results</h2>")
+                .append("<table><tr><th>Status</th><th>Action</th><th>Output</th></tr>");
+
+            for (PrepActionResult r : lastResults) {
+                String cls    = r.isSuccess() ? "ok" : "fail";
+                String status = r.isSuccess() ? "✓ PASS" : "✗ FAIL";
+                String msg = r.getMessage() == null ? ""
+                    : r.getMessage().replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");
+                html.append("<tr>")
+                    .append("<td class='").append(cls).append("'>").append(status).append("</td>")
+                    .append("<td>").append(r.getActionName()).append("</td>")
+                    .append("<td class='dim'>").append(msg).append("</td>")
+                    .append("</tr>");
+            }
+
+            html.append("</table></body></html>");
+
+            Path report = Paths.get(System.getProperty("user.home"), "GameReadyToolkit-report.html");
+            Files.writeString(report, html.toString());
+            if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(report.toFile());
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ Report saved: " + report);
+        } catch (IOException e) {
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✗ Report failed: " + e.getMessage());
         }
     }
 
