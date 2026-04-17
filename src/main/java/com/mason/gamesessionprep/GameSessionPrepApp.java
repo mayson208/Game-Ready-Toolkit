@@ -209,7 +209,7 @@ public class GameSessionPrepApp extends Application {
         Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
         debugTab.setClosable(false);
 
-        tabPane = new TabPane(optimizeTab, debugTab);
+        tabPane = new TabPane(optimizeTab, debugTab, buildNetworkTab());
         tabPane.setStyle(
             "-fx-background-color: " + BG + "; " +
             "-fx-tab-min-height: 32px; " +
@@ -1861,6 +1861,145 @@ public class GameSessionPrepApp extends Application {
                         "Write-Output 'Background apps closed'")));
             }
         }
+    }
+
+    // ── Network latency monitor tab ───────────────────────────────────────────
+    private Tab buildNetworkTab() {
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: " + BG + ";");
+
+        Label header = new Label("▌ LIVE NETWORK LATENCY MONITOR");
+        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                        "-fx-text-fill: " + CYAN + ";");
+
+        NumberAxis xAxis = new NumberAxis(0, 60, 10);
+        xAxis.setLabel("Seconds");
+        NumberAxis yAxis = new NumberAxis(0, 200, 50);
+        yAxis.setLabel("ms");
+
+        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
+        chart.setAnimated(false);
+        chart.setCreateSymbols(false);
+        chart.setStyle("-fx-background-color: " + BG_CARD + ";");
+        chart.setPrefHeight(280);
+
+        String[] chartColors = {CYAN, PINK, GREEN, AMBER, PURPLE, "#ff6600"};
+        int ci = 0;
+        for (String name : PING_SERVERS.keySet()) {
+            XYChart.Series<Number, Number> series = new XYChart.Series<>();
+            series.setName(name);
+            chart.getData().add(series);
+            pingSeriesMap.put(name, series);
+            ci++;
+        }
+
+        StringBuilder chartCss = new StringBuilder(
+            ".chart-plot-background{-fx-background-color:" + BG_CARD2 + ";}" +
+            ".chart-legend{-fx-background-color:" + BG_CARD + ";}" +
+            ".axis-label{-fx-text-fill:" + TEXT_DIM + ";}" +
+            ".chart-title{-fx-text-fill:" + TEXT_DIM + ";}");
+        for (int i = 0; i < PING_SERVERS.size(); i++) {
+            String c = chartColors[i % chartColors.length];
+            chartCss.append(".default-color").append(i)
+                    .append(".chart-series-line{-fx-stroke:").append(c).append(";-fx-stroke-width:2;}");
+        }
+        chart.getStylesheets().add("data:text/css," + chartCss);
+
+        // Live ping labels grid
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(20); grid.setVgap(6);
+        grid.setPadding(new Insets(8));
+        int row = 0;
+        for (String name : PING_SERVERS.keySet()) {
+            Label nameL = new Label(name);
+            nameL.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; " +
+                           "-fx-text-fill: " + TEXT_DIM + "; -fx-min-width: 140px;");
+            Label val = new Label("-- ms");
+            val.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                         "-fx-font-size: 13px; -fx-text-fill: " + GREEN + ";");
+            pingLabelMap.put(name, val);
+            grid.add(nameL, 0, row);
+            grid.add(val,   1, row);
+            row++;
+        }
+
+        Button startBtn = new Button("▶  START MONITOR");
+        startBtn.setStyle(smallBtnStyle(GREEN));
+        Button stopBtn = new Button("■  STOP");
+        stopBtn.setStyle(smallBtnStyle(RED));
+        stopBtn.setDisable(true);
+
+        startBtn.setOnAction(e -> {
+            startBtn.setDisable(true);
+            stopBtn.setDisable(false);
+            startPingMonitor(chart, xAxis);
+        });
+        stopBtn.setOnAction(e -> {
+            if (pingMonitorThread != null) pingMonitorThread.interrupt();
+            startBtn.setDisable(false);
+            stopBtn.setDisable(true);
+        });
+
+        HBox btnRow = new HBox(10, startBtn, stopBtn);
+        root.getChildren().addAll(header, new Separator(), chart, grid, btnRow);
+
+        ScrollPane sp = new ScrollPane(root);
+        sp.setFitToWidth(true);
+        sp.setStyle("-fx-background: " + BG + "; -fx-background-color: " + BG + "; -fx-border-color: transparent;");
+
+        Tab tab = new Tab("  ◈ NETWORK  ", sp);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private void startPingMonitor(LineChart<Number, Number> chart, NumberAxis xAxis) {
+        pingTick = 0;
+        pingSeriesMap.values().forEach(s -> s.getData().clear());
+
+        pingMonitorThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                int tick = pingTick++;
+                for (Map.Entry<String, String> entry : PING_SERVERS.entrySet()) {
+                    String name = entry.getKey();
+                    String host = entry.getValue();
+                    long ms = pingHost(host);
+                    Platform.runLater(() -> {
+                        XYChart.Series<Number, Number> series = pingSeriesMap.get(name);
+                        if (series != null) {
+                            series.getData().add(new XYChart.Data<>(tick, ms < 0 ? 0 : ms));
+                            if (series.getData().size() > 60) series.getData().remove(0);
+                        }
+                        Label lbl = pingLabelMap.get(name);
+                        if (lbl != null) {
+                            lbl.setText(ms < 0 ? "timeout" : ms + " ms");
+                            String col = ms < 0 ? RED : ms < 60 ? GREEN : ms < 120 ? AMBER : RED;
+                            lbl.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                                         "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
+                        }
+                        if (tick > 55) xAxis.setUpperBound(tick + 5);
+                    });
+                }
+                try { Thread.sleep(2000); }
+                catch (InterruptedException ex) { Thread.currentThread().interrupt(); break; }
+            }
+        }, "ping-monitor");
+        pingMonitorThread.setDaemon(true);
+        pingMonitorThread.start();
+    }
+
+    private long pingHost(String host) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("ping", "-n", "1", "-w", "1000", host);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String out = new String(p.getInputStream().readAllBytes());
+            boolean ok = p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0;
+            if (!ok) return -1;
+            Matcher m = Pattern.compile("time[=<](\\d+)ms").matcher(out);
+            if (m.find()) return Long.parseLong(m.group(1));
+            return -1;
+        } catch (Exception e) { return -1; }
     }
 
     // ── Auto-update check ─────────────────────────────────────────────────────
