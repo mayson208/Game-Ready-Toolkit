@@ -28,10 +28,20 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.stage.FileChooser;
 
 public class GameSessionPrepApp extends Application {
 
@@ -48,6 +58,10 @@ public class GameSessionPrepApp extends Application {
     private static final String RED      = "#ff0055";
     private static final String AMBER    = "#ffff00";
     private static final String PINK     = "#ff00cc";
+
+    private static final String VERSION             = "v1.1.0";
+    private static final String GITHUB_RELEASES_URL = "https://api.github.com/repos/mayson208/Game-Ready-Toolkit/releases/latest";
+    private static final String CLAUDE_API_URL      = "https://api.anthropic.com/v1/messages";
 
     // Category → accent color
     private static final Map<String, String> CAT_COLOR = Map.of(
@@ -84,6 +98,19 @@ public class GameSessionPrepApp extends Application {
     private long   sessionStartMs    = -1;
     private Thread sessionTimerThread;
 
+    // ── New feature state ─────────────────────────────────────────────────────
+    private Button reportBtn;
+    private List<PrepActionResult> lastResults = new ArrayList<>();
+    private final Map<String, XYChart.Series<Number, Number>> pingSeriesMap = new LinkedHashMap<>();
+    private final Map<String, Label> pingLabelMap = new LinkedHashMap<>();
+    private int    pingTick = 0;
+    private Thread pingMonitorThread;
+    private VBox   benchmarkResultsBox;
+    private final Map<String, String> baselineMetrics = new LinkedHashMap<>();
+    private final Map<String, String> afterMetrics    = new LinkedHashMap<>();
+    private final List<PrepAction> customActions = new ArrayList<>();
+    private VBox   customActionListBox;
+
     // ── Game profiles ─────────────────────────────────────────────────────────
     private static final Map<String, String> GAME_PROFILES = new LinkedHashMap<>();
     static {
@@ -95,6 +122,16 @@ public class GameSessionPrepApp extends Application {
         GAME_PROFILES.put("CS2",               "Source 2 — raw input, minimal overhead");
         GAME_PROFILES.put("Fortnite",          "UE5 — CPU thread optimization, shader pre-cache");
         GAME_PROFILES.put("Overwatch 2",       "Team FPS — balanced CPU/GPU load");
+    }
+
+    private static final Map<String, String> PING_SERVERS = new LinkedHashMap<>();
+    static {
+        PING_SERVERS.put("Riot (NA)",  "la1.lol.riotgames.com");
+        PING_SERVERS.put("Valve (US)", "iad.steamserver.net");
+        PING_SERVERS.put("EA (US)",    "prod.gs.ea.com");
+        PING_SERVERS.put("Blizzard",   "us.battle.net");
+        PING_SERVERS.put("Ubisoft",    "onlineconfig.ubi.com");
+        PING_SERVERS.put("Epic (US)",  "fortnite-public-service-prod11.ol.epicgames.com");
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
@@ -194,7 +231,7 @@ public class GameSessionPrepApp extends Application {
         root.setBottom(buildBottomBar(stage));
 
         Scene scene = new Scene(root, 780, 700);
-        stage.setTitle("◈ GAME READY TOOLKIT ◈");
+        stage.setTitle("◈ GAME READY TOOLKIT " + VERSION + " ◈");
         stage.setMinWidth(620);
         stage.getIcons().add(buildAppIcon());
         stage.setScene(scene);
