@@ -376,6 +376,15 @@ public class GameSessionPrepApp extends Application {
         selAll .setOnAction(e -> setAllSelected(true));
         selNone.setOnAction(e -> setAllSelected(false));
 
+        // Import / Export profile buttons
+        Button exportBtn = new Button("⬆ EXPORT");
+        exportBtn.setStyle(smallBtnStyle(CYAN));
+        exportBtn.setOnAction(e -> exportProfile(stage));
+
+        Button importBtn = new Button("⬇ IMPORT");
+        importBtn.setStyle(smallBtnStyle(CYAN));
+        importBtn.setOnAction(e -> importProfile(stage));
+
         // Report button
         reportBtn = new Button("📄 REPORT");
         reportBtn.setStyle(smallBtnStyle(AMBER));
@@ -390,7 +399,7 @@ public class GameSessionPrepApp extends Application {
         modeToggle.selectedProperty().addListener((obs, o, n) ->
             runBtn.setText(n ? "▶  RESTORE SYSTEM" : "▶  PREPARE SYSTEM"));
 
-        HBox btnRow = new HBox(10, modeToggle, selAll, selNone, new Region(), reportBtn, runBtn);
+        HBox btnRow = new HBox(10, modeToggle, selAll, selNone, new Region(), exportBtn, importBtn, reportBtn, runBtn);
         HBox.setHgrow(btnRow.getChildren().get(3), Priority.ALWAYS);
         btnRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -1869,6 +1878,79 @@ public class GameSessionPrepApp extends Application {
                         "Write-Output 'Background apps closed'")));
             }
         }
+    }
+
+    // ── Profile import / export ───────────────────────────────────────────────
+    private void exportProfile(Stage stage) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Export Profile");
+        fc.setInitialFileName(selectedGame.replaceAll("[^a-zA-Z0-9]", "_") + "_profile.json");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+        java.io.File file = fc.showSaveDialog(stage);
+        if (file == null) return;
+        try {
+            List<PrepAction> all = combineActions(gameActions, prepActions);
+            StringBuilder sb = new StringBuilder("{\n  \"game\": \"")
+                .append(jsonStringLiteral(selectedGame)).append("\",\n  \"selected\": [");
+            boolean first = true;
+            for (PrepAction a : all) {
+                if (a.isSelected()) {
+                    if (!first) sb.append(", ");
+                    sb.append("\"").append(jsonStringLiteral(a.getName())).append("\"");
+                    first = false;
+                }
+            }
+            sb.append("]\n}");
+            Files.writeString(file.toPath(), sb.toString());
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ Profile exported: " + file.getName());
+        } catch (IOException e) {
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✗ Export failed: " + e.getMessage());
+        }
+    }
+
+    private void importProfile(Stage stage) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Import Profile");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+        java.io.File file = fc.showOpenDialog(stage);
+        if (file == null) return;
+        try {
+            String json = Files.readString(file.toPath());
+            Matcher gameMatcher = Pattern.compile("\"game\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+            if (gameMatcher.find()) {
+                String game = gameMatcher.group(1);
+                if (GAME_PROFILES.containsKey(game)) {
+                    selectedGame = game;
+                    PREFS.put("selected_game", selectedGame);
+                    buildGameActions();
+                }
+            }
+            Matcher arrMatcher = Pattern.compile("\"selected\"\\s*:\\s*\\[([^]]*)]").matcher(json);
+            if (arrMatcher.find()) {
+                Set<String> names = new HashSet<>();
+                Matcher nm = Pattern.compile("\"([^\"]+)\"").matcher(arrMatcher.group(1));
+                while (nm.find()) names.add(nm.group(1));
+                List<PrepAction> all = combineActions(gameActions, prepActions);
+                for (PrepAction a : all) {
+                    boolean sel = names.contains(a.getName());
+                    a.setSelected(sel);
+                    PREFS.putBoolean((a.getCategory().equals("Game") ? "game_" : "prep_") + a.getName(), sel);
+                }
+            }
+            refreshTiles();
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✓ Profile imported: " + file.getName());
+        } catch (IOException e) {
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setText("✗ Import failed: " + e.getMessage());
+        }
+    }
+
+    private String jsonStringLiteral(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r");
     }
 
     // ── HTML system report ────────────────────────────────────────────────────
