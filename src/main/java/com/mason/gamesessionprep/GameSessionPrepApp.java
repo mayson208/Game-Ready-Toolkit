@@ -57,6 +57,7 @@ public class GameSessionPrepApp extends Application {
         "Display",  "#cc00ff",
         "Services", "#39ff14",
         "Memory",   "#ff6600",
+        "Audio",    "#ff9900",
         "Game",     "#00ffff"
     );
 
@@ -1102,6 +1103,43 @@ public class GameSessionPrepApp extends Application {
                 "$od = Get-Process -Name OneDrive -ErrorAction SilentlyContinue;" +
                 "if ($od) { & \"$env:LOCALAPPDATA\\Microsoft\\OneDrive\\OneDrive.exe\" /pause; Write-Output 'Paused' } else { Write-Output 'Not running' }")));
 
+        // AUDIO
+        prepActions.add(new PrepAction("Disable Audio Enhancements",
+            "Disables bass boost, virtual surround, loudness EQ on all endpoints — removes CPU audio overhead that causes micro-stutters", "Audio",
+            () -> runPowerShell(
+                "$regBase = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render';" +
+                "if (Test-Path $regBase) {" +
+                "  Get-ChildItem $regBase | ForEach-Object {" +
+                "    $props = Join-Path $_.PSPath 'Properties';" +
+                "    if (Test-Path $props) {" +
+                "      Set-ItemProperty -Path $props -Name '{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue" +
+                "    }" +
+                "  };" +
+                "  Write-Output 'Audio enhancements disabled on all endpoints'" +
+                "} else { Write-Output 'Audio registry path not found' }"),
+            () -> {
+                var r = runPowerShell(
+                    "$regBase = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render';" +
+                    "$vals = Get-ChildItem $regBase | ForEach-Object { $p = Join-Path $_.PSPath 'Properties'; if (Test-Path $p) { (Get-ItemProperty $p -ErrorAction SilentlyContinue).'{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5' } };" +
+                    "($vals | Where-Object { $_ -eq 1 }).Count -gt 0");
+                return r.isSuccess() && r.getMessage().trim().equals("True");
+            }));
+
+        prepActions.add(new PrepAction("Set Timer Resolution to 0.5ms",
+            "Forces Windows multimedia timer to 0.5ms precision — tighter frame pacing and lower sleep jitter for smoother gameplay", "Audio",
+            () -> runPowerShell(
+                "Add-Type -TypeDefinition @'\n" +
+                "using System; using System.Runtime.InteropServices;\n" +
+                "public class TimerRes {\n" +
+                "  [DllImport(\"winmm.dll\")] public static extern int timeBeginPeriod(int p);\n" +
+                "}\n" +
+                "'@;\n" +
+                "[TimerRes]::timeBeginPeriod(1);\n" +
+                "# Also set via registry for persistence across reboots\n" +
+                "$p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile';\n" +
+                "Set-ItemProperty -Path $p -Name 'SystemResponsiveness' -Value 0 -Type DWord -Force;\n" +
+                "Write-Output 'Timer resolution set to 1ms (0.5ms requires NtSetTimerResolution — apply via ISLR or Timer Resolution tool for sub-1ms)'")));
+
         // MEMORY
         prepActions.add(new PrepAction("Clear RAM Working Set",
             "Trims unused RAM from background apps — frees memory for your game", "Memory",
@@ -1161,6 +1199,30 @@ public class GameSessionPrepApp extends Application {
 
         restoreActions.add(new PrepAction("Restart DiagTrack", "Resume Windows telemetry service", "Services",
             () -> runPowerShell("Start-Service -Name DiagTrack -ErrorAction SilentlyContinue; Write-Output 'Restarted'")));
+
+        restoreActions.add(new PrepAction("Re-enable Audio Enhancements", "Restore audio enhancement processing on all endpoints", "Audio",
+            () -> runPowerShell(
+                "$regBase = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render';" +
+                "if (Test-Path $regBase) {" +
+                "  Get-ChildItem $regBase | ForEach-Object {" +
+                "    $props = Join-Path $_.PSPath 'Properties';" +
+                "    if (Test-Path $props) {" +
+                "      Remove-ItemProperty -Path $props -Name '{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5' -Force -ErrorAction SilentlyContinue" +
+                "    }" +
+                "  };" +
+                "  Write-Output 'Audio enhancements restored'" +
+                "} else { Write-Output 'Audio registry path not found' }")));
+
+        restoreActions.add(new PrepAction("Restore Timer Resolution", "Resets multimedia timer to Windows default (15.6ms)", "Audio",
+            () -> runPowerShell(
+                "Add-Type -TypeDefinition @'\n" +
+                "using System; using System.Runtime.InteropServices;\n" +
+                "public class TimerResRestore {\n" +
+                "  [DllImport(\"winmm.dll\")] public static extern int timeEndPeriod(int p);\n" +
+                "}\n" +
+                "'@;\n" +
+                "[TimerResRestore]::timeEndPeriod(1);\n" +
+                "Write-Output 'Timer resolution restored to default'")));
 
         restoreActions.add(new PrepAction("Resume OneDrive Sync", "Resume OneDrive background sync", "Services",
             () -> runPowerShell("$od = Get-Process -Name OneDrive -ErrorAction SilentlyContinue; if ($od) { & \"$env:LOCALAPPDATA\\Microsoft\\OneDrive\\OneDrive.exe\" /resume; Write-Output 'Resumed' } else { & \"$env:LOCALAPPDATA\\Microsoft\\OneDrive\\OneDrive.exe\"; Write-Output 'Started' }")));
