@@ -11,6 +11,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -45,35 +46,27 @@ import javafx.stage.FileChooser;
 
 public class GameSessionPrepApp extends Application {
 
-    // ── Theme — Retro 80s Synthwave ───────────────────────────────────────────
-    private static final String BG       = "#0d0015";
-    private static final String BG_CARD  = "#120028";
-    private static final String BG_CARD2 = "#1a003a";
-    private static final String BORDER   = "#ff00cc";
-    private static final String TEXT     = "#ffffff";
-    private static final String TEXT_DIM = "#cc88ff";
-    private static final String PURPLE   = "#cc00ff";
-    private static final String CYAN     = "#00ffff";
-    private static final String GREEN    = "#39ff14";
-    private static final String RED      = "#ff0055";
-    private static final String AMBER    = "#ffff00";
-    private static final String PINK     = "#ff00cc";
+    // ── Theme — Kinetic Typography ────────────────────────────────────────────
+    private static final String BG        = "#09090B";  // rich black
+    private static final String BG_CARD   = "#0F0F12";  // card surface
+    private static final String BG_CARD2  = "#18181B";  // zinc 900
+    private static final String MUTED     = "#27272A";  // zinc 800
+    private static final String BORDER    = "#3F3F46";  // zinc 700
+    private static final String TEXT      = "#FAFAFA";  // off-white
+    private static final String TEXT_DIM  = "#A1A1AA";  // zinc 400
+    private static final String ACCENT    = "#DFE104";  // acid yellow
+    private static final String ACCENT_FG = "#000000";  // black on yellow
+    private static final String GREEN     = "#39FF14";  // neon green (status ok)
+    private static final String RED       = "#FF3B30";  // red (errors / fail)
+    private static final String AMBER     = "#F5A623";  // amber (warnings)
+    // Legacy aliases — keep names so nothing else needs changing
+    private static final String PURPLE    = BORDER;
+    private static final String CYAN      = ACCENT;
+    private static final String PINK      = BORDER;
 
     private static final String VERSION             = "v1.1.0";
     private static final String GITHUB_RELEASES_URL = "https://api.github.com/repos/mayson208/Game-Ready-Toolkit/releases/latest";
     private static final String CLAUDE_API_URL      = "https://api.anthropic.com/v1/messages";
-
-    // Category → accent color
-    private static final Map<String, String> CAT_COLOR = Map.of(
-        "Power",    "#ffff00",
-        "CPU",      "#ff00cc",
-        "Network",  "#00ffff",
-        "Display",  "#cc00ff",
-        "Services", "#39ff14",
-        "Memory",   "#ff6600",
-        "Audio",    "#ff9900",
-        "Game",     "#00ffff"
-    );
 
     // ── State ─────────────────────────────────────────────────────────────────
     private static final Preferences PREFS =
@@ -172,9 +165,7 @@ public class GameSessionPrepApp extends Application {
 
         // ── ROOT ──────────────────────────────────────────────────────────────
         BorderPane root = new BorderPane();
-        root.setStyle(
-            "-fx-background-color: " + BG + "; " +
-            "-fx-border-color: " + PINK + "; -fx-border-width: 3;");
+        root.setStyle("-fx-background-color: " + BG + ";");
 
         // ── TOP BAR ───────────────────────────────────────────────────────────
         root.setTop(buildTopBar());
@@ -195,7 +186,7 @@ public class GameSessionPrepApp extends Application {
         // Optimize tab
         Tab optimizeTab = new Tab("  ⚡ OPTIMIZE  ", scroll);
         optimizeTab.setClosable(false);
-        optimizeTab.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold;");
+        optimizeTab.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold;");
 
         // Debug tab
         debugLog = new TextArea("[ No runs yet — hit PREPARE SYSTEM to see output here ]\n");
@@ -203,7 +194,7 @@ public class GameSessionPrepApp extends Application {
         debugLog.setWrapText(true);
         debugLog.setStyle(
             "-fx-font-family: Consolas; -fx-font-size: 12px; " +
-            "-fx-control-inner-background: #080010; -fx-text-fill: #00ff00; " +
+            "-fx-control-inner-background: " + BG + "; -fx-text-fill: " + GREEN + "; " +
             "-fx-border-color: transparent;");
 
         Tab debugTab = new Tab("  ▶ DEBUG LOG  ", debugLog);
@@ -219,10 +210,10 @@ public class GameSessionPrepApp extends Application {
         // Style tab headers via CSS
         tabPane.getStylesheets().add("data:text/css," +
             ".tab-pane .tab-header-area .tab-header-background{-fx-background-color:" + BG_CARD + ";}" +
-            ".tab-pane .tab{-fx-background-color:" + BG_CARD2 + ";-fx-border-color:" + BORDER + ";-fx-border-width:0 1 0 0;}" +
-            ".tab-pane .tab:selected{-fx-background-color:" + BG + ";-fx-border-color:" + PINK + ";-fx-border-width:0 0 2 0;}" +
-            ".tab-pane .tab .tab-label{-fx-text-fill:" + TEXT_DIM + ";-fx-font-family:Consolas;-fx-font-weight:bold;-fx-font-size:11px;}" +
-            ".tab-pane .tab:selected .tab-label{-fx-text-fill:" + CYAN + ";}" +
+            ".tab-pane .tab{-fx-background-color:" + MUTED + ";-fx-border-color:" + BORDER + ";-fx-border-width:0 1 0 0;-fx-background-radius:0;-fx-border-radius:0;}" +
+            ".tab-pane .tab:selected{-fx-background-color:" + ACCENT + ";-fx-border-color:" + ACCENT + ";-fx-border-width:0;-fx-background-radius:0;-fx-border-radius:0;}" +
+            ".tab-pane .tab .tab-label{-fx-text-fill:" + TEXT_DIM + ";-fx-font-family:'Segoe UI';-fx-font-weight:bold;-fx-font-size:11px;}" +
+            ".tab-pane .tab:selected .tab-label{-fx-text-fill:" + ACCENT_FG + ";-fx-font-family:'Segoe UI';-fx-font-weight:bold;}" +
             ".tab-pane>.tab-content-area{-fx-background-color:" + BG + ";}");
 
         root.setCenter(tabPane);
@@ -243,47 +234,57 @@ public class GameSessionPrepApp extends Application {
 
     // ── Top bar ───────────────────────────────────────────────────────────────
     private VBox buildTopBar() {
-        // Logo / title
-        Label title = new Label("GAME READY");
-        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                       "-fx-text-fill: " + CYAN + ";");
+        // ── TITLE ────────────────────────────────────────────────────────────
+        Label titleA = new Label("GAME READY");
+        titleA.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 30px; " +
+            "-fx-text-fill: " + TEXT + ";");
 
-        Label subtitle = new Label("TOOLKIT");
-        subtitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-                          "-fx-text-fill: " + PINK + ";");
+        Label titleB = new Label("TOOLKIT");
+        titleB.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 30px; " +
+            "-fx-text-fill: " + ACCENT + ";");
 
-        HBox logoBox = new HBox(8, title, subtitle);
+        Label vBadge = new Label(VERSION);
+        vBadge.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 9px; " +
+            "-fx-text-fill: " + ACCENT_FG + "; -fx-background-color: " + ACCENT + "; " +
+            "-fx-padding: 3 7; -fx-background-radius: 0;");
+
+        HBox logoBox = new HBox(10, titleA, titleB, vBadge);
         logoBox.setAlignment(Pos.CENTER_LEFT);
 
         // Timer
         timerLabel = new Label();
-        timerLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 12px; " +
-                            "-fx-font-family: Consolas; -fx-font-weight: bold;");
+        timerLabel.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
+            "-fx-text-fill: " + ACCENT + ";");
         timerLabel.setVisible(false);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Game selector
-        Label gameLabel = new Label("► SELECT GAME");
-        gameLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 10px; " +
-                           "-fx-font-family: Consolas; -fx-font-weight: bold;");
+        // ── GAME SELECTOR ────────────────────────────────────────────────────
+        Label gameLabel = new Label("GAME PROFILE");
+        gameLabel.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 9px; " +
+            "-fx-text-fill: " + TEXT_DIM + ";");
 
         ComboBox<String> gameCombo = new ComboBox<>();
         gameCombo.getItems().addAll(GAME_PROFILES.keySet());
         gameCombo.setValue(PREFS.get("selected_game", "General"));
         selectedGame = gameCombo.getValue();
         gameCombo.setStyle(
-            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: #ffffff; " +
-            "-fx-border-color: " + CYAN + "; -fx-border-width: 2; " +
-            "-fx-font-size: 12px; -fx-font-family: Consolas; -fx-font-weight: bold; -fx-pref-width: 210px;");
-        // Force the button cell text to white too
+            "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + "; " +
+            "-fx-border-color: " + BORDER + "; -fx-border-width: 2; " +
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 12px; " +
+            "-fx-pref-width: 220px; -fx-background-radius: 0; -fx-border-radius: 0;");
         gameCombo.setButtonCell(new javafx.scene.control.ListCell<>() {
             @Override protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? "" : item);
-                setStyle("-fx-text-fill: #ffffff; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-                         "-fx-font-size: 12px; -fx-background-color: " + BG_CARD2 + ";");
+                setStyle("-fx-text-fill: " + TEXT + "; -fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                         "-fx-font-size: 12px; -fx-background-color: " + BG_CARD2 + "; -fx-background-radius: 0;");
             }
         });
 
@@ -293,7 +294,7 @@ public class GameSessionPrepApp extends Application {
             buildGameActions();
             refreshTiles();
             if (gameDescLabel != null)
-                gameDescLabel.setText("► " + GAME_PROFILES.getOrDefault(selectedGame, ""));
+                gameDescLabel.setText(GAME_PROFILES.getOrDefault(selectedGame, "").toUpperCase());
         });
 
         VBox gamePicker = new VBox(3, gameLabel, gameCombo);
@@ -301,31 +302,74 @@ public class GameSessionPrepApp extends Application {
 
         HBox mainRow = new HBox(16, logoBox, spacer, timerLabel, gamePicker);
         mainRow.setAlignment(Pos.CENTER_LEFT);
-        mainRow.setPadding(new Insets(16, 20, 8, 20));
+        mainRow.setPadding(new Insets(14, 20, 10, 20));
 
-        // Game description strip
-        gameDescLabel = new Label("► " + GAME_PROFILES.getOrDefault(selectedGame, ""));
-        gameDescLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 10px; " +
-                               "-fx-font-family: Consolas; -fx-padding: 0 20 0 20;");
+        // ── INFO STRIP ───────────────────────────────────────────────────────
+        gameDescLabel = new Label(GAME_PROFILES.getOrDefault(selectedGame, "").toUpperCase());
+        gameDescLabel.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 10px; " +
+            "-fx-text-fill: " + TEXT_DIM + "; -fx-padding: 0 0 0 20;");
 
-        // Sys info strip
         sysInfoLabel = new Label("CPU: --   RAM: --");
-        sysInfoLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 10px; " +
-                              "-fx-font-family: Consolas; -fx-font-weight: bold; " +
-                              "-fx-padding: 0 20 8 20;");
+        sysInfoLabel.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 10px; " +
+            "-fx-text-fill: " + ACCENT + "; -fx-padding: 0 20 0 0;");
         startSysInfoUpdater();
 
-        HBox bottomStrip = new HBox();
-        bottomStrip.getChildren().addAll(gameDescLabel, new Region(), sysInfoLabel);
-        HBox.setHgrow(bottomStrip.getChildren().get(1), Priority.ALWAYS);
-        bottomStrip.setMaxWidth(Double.MAX_VALUE);
+        HBox infoRow = new HBox();
+        infoRow.getChildren().addAll(gameDescLabel, new Region(), sysInfoLabel);
+        HBox.setHgrow(infoRow.getChildren().get(1), Priority.ALWAYS);
+        infoRow.setMaxWidth(Double.MAX_VALUE);
+        infoRow.setPadding(new Insets(0, 0, 8, 0));
 
-        VBox topBar = new VBox(0, mainRow, bottomStrip);
+        VBox topBar = new VBox(0, mainRow, infoRow, buildMarqueeStrip());
         topBar.setStyle(
             "-fx-background-color: " + BG_CARD + "; " +
-            "-fx-border-color: " + PINK + "; " +
-            "-fx-border-width: 0 0 3 0;");
+            "-fx-border-color: " + BORDER + "; -fx-border-width: 0 0 2 0;");
         return topBar;
+    }
+
+    // ── Marquee strip ─────────────────────────────────────────────────────────
+    private Region buildMarqueeStrip() {
+        String content =
+            "  GAME READY  ◆  OPTIMIZE  ◆  BOOST FPS  ◆  LOWER LATENCY  ◆  " +
+            "CPU PRIORITY  ◆  KILL BACKGROUND APPS  ◆  NETWORK TUNING  ◆  " +
+            "POWER PLAN  ◆  AUDIO TWEAKS  ◆  DOMINATE  ◆  ";
+
+        Label lbl = new Label(content.repeat(5));
+        lbl.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+            "-fx-text-fill: " + ACCENT_FG + "; -fx-padding: 7 0;");
+        lbl.setMinWidth(Region.USE_PREF_SIZE);
+
+        Pane track = new Pane(lbl);
+        track.setMinHeight(32); track.setMaxHeight(32);
+
+        Rectangle clip = new Rectangle();
+        clip.setHeight(32);
+        track.setClip(clip);
+
+        HBox outer = new HBox(track);
+        HBox.setHgrow(track, Priority.ALWAYS);
+        outer.setStyle("-fx-background-color: " + ACCENT + ";");
+        outer.setMinHeight(32); outer.setMaxHeight(32);
+        outer.widthProperty().addListener((obs, o, w) -> clip.setWidth(w.doubleValue()));
+
+        lbl.widthProperty().addListener((obs, o, w) -> {
+            if (w.doubleValue() > 0 && !lbl.getProperties().containsKey("anim")) {
+                lbl.getProperties().put("anim", Boolean.TRUE);
+                double oneRepeat = w.doubleValue() / 5.0;
+                TranslateTransition tt = new TranslateTransition(
+                    Duration.seconds(oneRepeat / 90.0), lbl);
+                tt.setFromX(0);
+                tt.setToX(-oneRepeat);
+                tt.setCycleCount(Animation.INDEFINITE);
+                tt.setInterpolator(Interpolator.LINEAR);
+                tt.play();
+            }
+        });
+
+        return outer;
     }
 
     private void startSysInfoUpdater() {
@@ -407,20 +451,20 @@ public class GameSessionPrepApp extends Application {
         progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(Double.MAX_VALUE);
         progressBar.setVisible(false);
-        progressBar.setStyle("-fx-accent: " + CYAN + "; -fx-background-color: " + BG_CARD2 + "; " +
-                             "-fx-border-color: " + CYAN + "; -fx-border-width: 1;");
+        progressBar.setStyle("-fx-accent: " + ACCENT + "; -fx-background-color: " + MUTED + "; " +
+                             "-fx-border-color: " + BORDER + "; -fx-border-width: 1;");
 
         statusLabel = new Label();
         statusLabel.setStyle("-fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 11px; " +
-                             "-fx-font-family: Consolas;");
+                             "-fx-font-family: 'Segoe UI';");
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: " + PINK + "; -fx-opacity: 0.8;");
+        sep.setStyle("-fx-background-color: " + BORDER + ";");
 
         VBox bottom = new VBox(10, sep, btnRow, progressBar, statusLabel);
         bottom.setPadding(new Insets(12, 20, 16, 20));
         bottom.setStyle("-fx-background-color: " + BG_CARD + "; " +
-                        "-fx-border-color: " + PINK + "; -fx-border-width: 3 0 0 0;");
+                        "-fx-border-color: " + BORDER + "; -fx-border-width: 2 0 0 0;");
         return bottom;
     }
 
@@ -470,124 +514,126 @@ public class GameSessionPrepApp extends Application {
     }
 
     private VBox buildCategoryTile(String category, List<PrepAction> actions) {
-        String color = CAT_COLOR.getOrDefault(category, PURPLE);
         String tileBase =
             "-fx-background-color: " + BG_CARD + "; " +
-            "-fx-border-color: " + color + "; " +
-            "-fx-border-width: 2; " +
-            "-fx-effect: dropshadow(gaussian, " + color + ", 10, 0.4, 3, 3);";
+            "-fx-border-color: " + BORDER + "; -fx-border-width: 2;";
         String tileHover =
-            "-fx-background-color: " + BG_CARD2 + "; " +
-            "-fx-border-color: " + color + "; " +
-            "-fx-border-width: 2; " +
-            "-fx-effect: dropshadow(gaussian, " + color + ", 20, 0.8, 3, 3);";
+            "-fx-background-color: " + ACCENT + "; " +
+            "-fx-border-color: " + ACCENT + "; -fx-border-width: 2;";
+        String cbBase =
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+            "-fx-text-fill: " + TEXT + "; -fx-mark-color: " + ACCENT + "; -fx-focus-color: " + ACCENT + ";";
+        String cbHover =
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+            "-fx-text-fill: " + ACCENT_FG + "; -fx-mark-color: " + ACCENT_FG + "; -fx-focus-color: " + ACCENT_FG + ";";
 
         VBox tile = new VBox(8);
         tile.setPadding(new Insets(14));
         tile.setStyle(tileBase);
 
-        // Tile header
-        Circle dot = new Circle(5, Color.web(color));
-        Label catLabel = new Label("▌ " + category.toUpperCase());
-        catLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px; " +
-                          "-fx-font-weight: bold; -fx-font-family: Consolas;");
-
-        // Pulse animation on dot
-        FadeTransition pulse = new FadeTransition(Duration.millis(900), dot);
-        pulse.setFromValue(1.0);
-        pulse.setToValue(0.2);
-        pulse.setCycleCount(Animation.INDEFINITE);
-        pulse.setAutoReverse(true);
-        pulse.play();
-
-        HBox header = new HBox(8, dot, catLabel);
-        header.setAlignment(Pos.CENTER_LEFT);
+        Label catLabel = new Label(category.toUpperCase());
+        catLabel.setStyle(
+            "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
+            "-fx-text-fill: " + ACCENT + ";");
 
         Separator divider = new Separator();
-        divider.setStyle("-fx-background-color: " + color + "; -fx-opacity: 0.4;");
+        divider.setStyle("-fx-background-color: " + BORDER + "; -fx-opacity: 0.5;");
+        tile.getChildren().addAll(catLabel, divider);
 
-        tile.getChildren().addAll(header, divider);
-
-        // Network warning label
         if (category.equals("Network")) {
             Label warn = new Label("⚠  USE AT YOUR OWN RISK");
-            warn.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 10px; " +
-                          "-fx-font-family: Consolas; -fx-font-weight: bold;");
+            warn.setStyle(
+                "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 9px; " +
+                "-fx-text-fill: " + AMBER + ";");
             tile.getChildren().add(warn);
         }
+
+        List<CheckBox> checkBoxes = new ArrayList<>();
 
         for (PrepAction action : actions) {
             String prefix = action.getCategory().equals("Game") ? "game_" :
                             restoreMode ? "restore_" : "prep_";
 
-            CheckBox cb = new CheckBox(action.getName());
+            CheckBox cb = new CheckBox(action.getName().toUpperCase());
             boolean saved = PREFS.getBoolean(prefix + action.getName(), true);
             cb.setSelected(saved);
             action.setSelected(saved);
-            cb.setStyle(
-                "-fx-text-fill: " + TEXT + "; -fx-font-size: 12px; " +
-                "-fx-font-family: Consolas; -fx-mark-color: " + color + "; " +
-                "-fx-focus-color: " + color + ";");
+            cb.setStyle(cbBase);
+            checkBoxes.add(cb);
 
-            // Status dot: green=applied, grey=not applied, dim=unknown
             Circle statusDot = new Circle(4);
             Boolean applied = action.checkApplied();
             updateStatusDot(statusDot, applied);
 
-            Tooltip dotTip = new Tooltip(applied == null ? "Status unknown" :
-                applied ? "Already applied" : "Not yet applied");
-            dotTip.setStyle("-fx-font-size: 10px; -fx-font-family: Consolas; " +
+            Tooltip dotTip = new Tooltip(
+                applied == null ? "Status unknown" : applied ? "Already applied" : "Not yet applied");
+            dotTip.setStyle("-fx-font-size: 10px; -fx-font-family: 'Segoe UI'; " +
                             "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + ";");
             Tooltip.install(statusDot, dotTip);
 
             String tipText = action.getDescription() +
                 (action.getCategory().equals("Network") ? "\n\n⚠ Use at your own risk." : "");
             Tooltip tip = new Tooltip(tipText);
-            tip.setStyle("-fx-font-size: 11px; -fx-background-color: " + BG_CARD2 + "; " +
-                         "-fx-text-fill: " + color + "; -fx-border-color: " + color + "; " +
-                         "-fx-border-width: 2; -fx-font-family: Consolas;");
+            tip.setStyle("-fx-font-size: 11px; -fx-font-family: 'Segoe UI'; " +
+                         "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + "; " +
+                         "-fx-border-color: " + BORDER + "; -fx-border-width: 2;");
             tip.setWrapText(true);
-            tip.setMaxWidth(300);
+            tip.setMaxWidth(320);
             cb.setTooltip(tip);
 
-            HBox row = new HBox(6, statusDot, cb);
-            row.setAlignment(Pos.CENTER_LEFT);
+            HBox rowBox = new HBox(6, statusDot, cb);
+            rowBox.setAlignment(Pos.CENTER_LEFT);
 
             String finalPrefix = prefix;
             cb.selectedProperty().addListener((obs, o, n) -> {
                 action.setSelected(n);
                 PREFS.putBoolean(finalPrefix + action.getName(), n);
             });
-            tile.getChildren().add(row);
+            tile.getChildren().add(rowBox);
         }
 
-        tile.setOnMouseEntered(e -> tile.setStyle(tileHover));
-        tile.setOnMouseExited(e -> tile.setStyle(tileBase));
+        // Hard hover inversion
+        tile.setOnMouseEntered(e -> {
+            tile.setStyle(tileHover);
+            catLabel.setStyle(
+                "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                "-fx-text-fill: " + ACCENT_FG + ";");
+            checkBoxes.forEach(cb -> cb.setStyle(cbHover));
+        });
+        tile.setOnMouseExited(e -> {
+            tile.setStyle(tileBase);
+            catLabel.setStyle(
+                "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                "-fx-text-fill: " + ACCENT + ";");
+            checkBoxes.forEach(cb -> cb.setStyle(cbBase));
+        });
 
         return tile;
     }
 
     // ── Styles ────────────────────────────────────────────────────────────────
     private String runBtnStyle() {
-        return "-fx-background-color: " + PINK + "; -fx-text-fill: #000000; " +
-               "-fx-font-size: 13px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
-               "-fx-border-color: " + PINK + "; -fx-border-width: 2; " +
-               "-fx-padding: 9 26; -fx-cursor: hand;";
+        return "-fx-background-color: " + ACCENT + "; -fx-text-fill: " + ACCENT_FG + "; " +
+               "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
+               "-fx-border-color: " + ACCENT + "; -fx-border-width: 2; " +
+               "-fx-padding: 9 26; -fx-cursor: hand; -fx-background-radius: 0; -fx-border-radius: 0;";
     }
 
     private String toggleStyle(boolean active) {
-        String color = active ? RED : CYAN;
-        return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
-               "-fx-border-color: " + color + "; -fx-border-width: 2; " +
-               "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-               "-fx-padding: 7 14; -fx-cursor: hand;";
+        String bg  = active ? RED   : "transparent";
+        String fg  = active ? TEXT  : TEXT;
+        String bdr = active ? RED   : BORDER;
+        return "-fx-background-color: " + bg + "; -fx-text-fill: " + fg + "; " +
+               "-fx-border-color: " + bdr + "; -fx-border-width: 2; " +
+               "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+               "-fx-padding: 7 14; -fx-cursor: hand; -fx-background-radius: 0; -fx-border-radius: 0;";
     }
 
-    private String smallBtnStyle(String color) {
-        return "-fx-background-color: " + BG_CARD2 + "; -fx-text-fill: " + color + "; " +
-               "-fx-border-color: " + color + "; -fx-border-width: 2; " +
-               "-fx-font-size: 11px; -fx-font-family: Consolas; -fx-font-weight: bold; " +
-               "-fx-padding: 7 14; -fx-cursor: hand;";
+    private String smallBtnStyle(String ignoredColor) {
+        return "-fx-background-color: transparent; -fx-text-fill: " + TEXT + "; " +
+               "-fx-border-color: " + BORDER + "; -fx-border-width: 2; " +
+               "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+               "-fx-padding: 7 14; -fx-cursor: hand; -fx-background-radius: 0; -fx-border-radius: 0;";
     }
 
     // ── Select helpers ────────────────────────────────────────────────────────
@@ -607,7 +653,7 @@ public class GameSessionPrepApp extends Application {
     private void showPreview(Stage stage, Button runBtn) {
         List<PrepAction> selected = getSelected();
         if (selected.isEmpty()) {
-            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("⚠ No actions selected.");
             return;
         }
@@ -647,7 +693,7 @@ public class GameSessionPrepApp extends Application {
                     PrepAction action = selected.get(i);
                     updateProgress(i, selected.size());
                     Platform.runLater(() -> {
-                        statusLabel.setStyle("-fx-text-fill: " + CYAN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                        statusLabel.setStyle("-fx-text-fill: " + CYAN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
                         statusLabel.setText("⟳ " + action.getName() + "...");
                     });
                     results.add(action.execute());
@@ -679,10 +725,10 @@ public class GameSessionPrepApp extends Application {
             refreshTiles();
 
             if (failed == 0) {
-                statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
                 statusLabel.setText("✓ All " + passed + " actions completed.");
             } else {
-                statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
                 statusLabel.setText("⚠ " + passed + " succeeded, " + failed + " failed.");
                 // Auto-switch to debug tab so user can see what failed
                 if (tabPane != null) tabPane.getSelectionModel().select(1);
@@ -692,7 +738,7 @@ public class GameSessionPrepApp extends Application {
         task.setOnFailed(e -> {
             progressBar.progressProperty().unbind();
             runBtn.setDisable(false);
-            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✗ Error: " + task.getException().getMessage());
         });
 
@@ -719,13 +765,13 @@ public class GameSessionPrepApp extends Application {
         Label headline = new Label(allGood
             ? (restoreMode ? "SYSTEM RESTORED" : "SYSTEM READY TO GAME")
             : passed + " SUCCEEDED · " + failed + " FAILED");
-        headline.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: Consolas; " +
+        headline.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: 'Segoe UI'; " +
                           "-fx-text-fill: " + mainColor + ";");
 
         Label sub = new Label(allGood
             ? "All " + passed + " optimizations applied successfully."
             : "Some actions failed — check the log for details.");
-        sub.setStyle("-fx-font-size: 11px; -fx-font-family: Consolas; -fx-text-fill: " + TEXT_DIM + ";");
+        sub.setStyle("-fx-font-size: 11px; -fx-font-family: 'Segoe UI'; -fx-text-fill: " + TEXT_DIM + ";");
 
         VBox headerBox = new VBox(6, icon, headline, sub);
         headerBox.setAlignment(Pos.CENTER);
@@ -738,12 +784,12 @@ public class GameSessionPrepApp extends Application {
             String color = r.isSuccess() ? GREEN : RED;
             String prefix = r.isSuccess() ? "✓ " : "✗ ";
             Label row = new Label(prefix + r.getActionName());
-            row.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + color + ";");
+            row.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; -fx-text-fill: " + color + ";");
             resultList.getChildren().add(row);
             String msg = r.getMessage();
             if (msg != null && !msg.isBlank() && !msg.equals("OK") && !r.isSuccess()) {
                 Label detail = new Label("   → " + msg.split("\n")[0]);
-                detail.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-text-fill: " + TEXT_DIM + ";");
+                detail.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 10px; -fx-text-fill: " + TEXT_DIM + ";");
                 detail.setWrapText(true);
                 resultList.getChildren().add(detail);
             }
@@ -758,7 +804,7 @@ public class GameSessionPrepApp extends Application {
         // Buttons
         Button closeBtn = new Button("Done");
         closeBtn.setStyle("-fx-background-color: " + PURPLE + "; -fx-text-fill: white; " +
-                          "-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                          "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
                           "-fx-padding: 8 28; -fx-background-radius: 8; -fx-cursor: hand;");
         closeBtn.setOnAction(e -> popup.close());
 
@@ -1887,12 +1933,12 @@ public class GameSessionPrepApp extends Application {
         root.setStyle("-fx-background-color: " + BG + ";");
 
         Label header = new Label("▌ AI RECOMMENDATIONS  (Claude API)");
-        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+        header.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
                         "-fx-font-size: 13px; -fx-text-fill: " + PINK + ";");
 
         Label info = new Label(
             "Enter your Anthropic API key to get AI-powered, game-specific optimization tips based on your system.");
-        info.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
+        info.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
         info.setWrapText(true);
 
         PasswordField apiKeyField = new PasswordField();
@@ -1908,7 +1954,7 @@ public class GameSessionPrepApp extends Application {
         outputArea.setPrefRowCount(18);
         outputArea.setStyle(
             "-fx-control-inner-background: #080010; -fx-text-fill: " + PINK + "; " +
-            "-fx-font-family: Consolas; -fx-font-size: 12px; " +
+            "-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; " +
             "-fx-border-color: " + PINK + "; -fx-border-width: 1;");
 
         Button analyzeBtn = new Button("⚡  ANALYZE MY SYSTEM");
@@ -1999,7 +2045,7 @@ public class GameSessionPrepApp extends Application {
         root.setStyle("-fx-background-color: " + BG + ";");
 
         Label header = new Label("▌ CUSTOM ACTION BUILDER");
-        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+        header.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
                         "-fx-font-size: 13px; -fx-text-fill: " + PURPLE + ";");
 
         TextField nameField = new TextField();
@@ -2017,7 +2063,7 @@ public class GameSessionPrepApp extends Application {
         scriptArea.setStyle(
             "-fx-control-inner-background: " + BG_CARD2 + "; -fx-text-fill: " + GREEN + "; " +
             "-fx-prompt-text-fill: " + TEXT_DIM + "; -fx-font-family: Consolas; -fx-font-size: 11px; " +
-            "-fx-border-color: " + PURPLE + "; -fx-border-width: 1;");
+            "-fx-border-color: " + BORDER + "; -fx-border-width: 2;");
 
         Button addBtn = new Button("+ ADD ACTION");
         addBtn.setStyle(smallBtnStyle(PURPLE));
@@ -2026,7 +2072,7 @@ public class GameSessionPrepApp extends Application {
             String d = descField.getText().trim();
             String s = scriptArea.getText().trim();
             if (n.isEmpty() || s.isEmpty()) {
-                statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
                 statusLabel.setText("⚠ Name and script are required.");
                 return;
             }
@@ -2034,7 +2080,7 @@ public class GameSessionPrepApp extends Application {
             customActions.add(new PrepAction(n, desc, "Game", () -> runPowerShell(s)));
             nameField.clear(); descField.clear(); scriptArea.clear();
             refreshCustomActionList();
-            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ Custom action added: " + n);
         });
 
@@ -2048,7 +2094,7 @@ public class GameSessionPrepApp extends Application {
                       "-fx-border-color: " + PURPLE + "; -fx-border-width: 2;");
 
         Label listHeader = new Label("▌ SAVED CUSTOM ACTIONS");
-        listHeader.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; " +
+        listHeader.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 11px; " +
                             "-fx-font-weight: bold; -fx-text-fill: " + TEXT_DIM + ";");
 
         customActionListBox = new VBox(4);
@@ -2070,26 +2116,26 @@ public class GameSessionPrepApp extends Application {
         customActionListBox.getChildren().clear();
         if (customActions.isEmpty()) {
             Label empty = new Label("  No custom actions yet — build one above.");
-            empty.setStyle("-fx-font-family: Consolas; -fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 11px;");
+            empty.setStyle("-fx-font-family: 'Segoe UI'; -fx-text-fill: " + TEXT_DIM + "; -fx-font-size: 11px;");
             customActionListBox.getChildren().add(empty);
             return;
         }
         for (int i = 0; i < customActions.size(); i++) {
             PrepAction a = customActions.get(i);
             Label lbl = new Label("▸ " + a.getName());
-            lbl.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + TEXT + ";");
+            lbl.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; -fx-text-fill: " + TEXT + ";");
             final int idx = i;
             Button del = new Button("✕");
             del.setStyle("-fx-background-color: transparent; -fx-text-fill: " + RED + "; " +
-                         "-fx-font-family: Consolas; -fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 2 6;");
+                         "-fx-font-family: 'Segoe UI'; -fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 2 6;");
             del.setOnAction(e -> { customActions.remove(idx); refreshCustomActionList(); });
             Button run = new Button("▶");
             run.setStyle("-fx-background-color: transparent; -fx-text-fill: " + GREEN + "; " +
-                         "-fx-font-family: Consolas; -fx-cursor: hand; -fx-padding: 2 6;");
+                         "-fx-font-family: 'Segoe UI'; -fx-cursor: hand; -fx-padding: 2 6;");
             run.setOnAction(e -> {
                 PrepActionResult r = a.execute();
                 statusLabel.setStyle("-fx-text-fill: " + (r.isSuccess() ? GREEN : RED) +
-                                     "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+                                     "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
                 statusLabel.setText((r.isSuccess() ? "✓ " : "✗ ") + a.getName() + ": " + r.getMessage());
             });
             Region spacer = new Region();
@@ -2106,14 +2152,16 @@ public class GameSessionPrepApp extends Application {
 
     private String inputStyle() {
         return "-fx-control-inner-background: " + BG_CARD2 + "; -fx-text-fill: " + TEXT + "; " +
-               "-fx-prompt-text-fill: " + TEXT_DIM + "; -fx-font-family: Consolas; -fx-font-size: 12px; " +
-               "-fx-border-color: " + PURPLE + "; -fx-border-width: 1;";
+               "-fx-prompt-text-fill: " + TEXT_DIM + "; -fx-font-family: 'Segoe UI'; " +
+               "-fx-font-weight: bold; -fx-font-size: 12px; " +
+               "-fx-border-color: " + BORDER + "; -fx-border-width: 2; " +
+               "-fx-background-radius: 0; -fx-border-radius: 0;";
     }
 
     private Label fieldLabel(String text) {
         Label l = new Label(text);
-        l.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; " +
-                   "-fx-text-fill: " + TEXT_DIM + "; -fx-font-weight: bold;");
+        l.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 10px; " +
+                   "-fx-text-fill: " + TEXT_DIM + ";");
         return l;
     }
 
@@ -2139,10 +2187,10 @@ public class GameSessionPrepApp extends Application {
             }
             sb.append("]\n}");
             Files.writeString(file.toPath(), sb.toString());
-            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ Profile exported: " + file.getName());
         } catch (IOException e) {
-            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✗ Export failed: " + e.getMessage());
         }
     }
@@ -2177,10 +2225,10 @@ public class GameSessionPrepApp extends Application {
                 }
             }
             refreshTiles();
-            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ Profile imported: " + file.getName());
         } catch (IOException e) {
-            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✗ Import failed: " + e.getMessage());
         }
     }
@@ -2193,7 +2241,7 @@ public class GameSessionPrepApp extends Application {
     // ── HTML system report ────────────────────────────────────────────────────
     private void generateHtmlReport() {
         if (lastResults.isEmpty()) {
-            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("⚠ No results yet — run PREPARE SYSTEM first.");
             return;
         }
@@ -2244,10 +2292,10 @@ public class GameSessionPrepApp extends Application {
             Path report = Paths.get(System.getProperty("user.home"), "GameReadyToolkit-report.html");
             Files.writeString(report, html.toString());
             if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(report.toFile());
-            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ Report saved: " + report);
         } catch (IOException e) {
-            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + RED + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✗ Report failed: " + e.getMessage());
         }
     }
@@ -2259,12 +2307,12 @@ public class GameSessionPrepApp extends Application {
         root.setStyle("-fx-background-color: " + BG + ";");
 
         Label header = new Label("▌ BEFORE / AFTER BENCHMARK");
-        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+        header.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
                         "-fx-text-fill: " + AMBER + ";");
 
         Label info = new Label(
             "Capture baseline metrics BEFORE running optimizations, then capture AFTER to compare the delta.");
-        info.setStyle("-fx-font-family: Consolas; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
+        info.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 11px; -fx-text-fill: " + TEXT_DIM + ";");
         info.setWrapText(true);
 
         benchmarkResultsBox = new VBox(4);
@@ -2279,13 +2327,13 @@ public class GameSessionPrepApp extends Application {
         baselineBtn.setOnAction(e -> {
             captureMetrics(baselineMetrics);
             refreshBenchmarkTable();
-            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + AMBER + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ Baseline captured.");
         });
         afterBtn.setOnAction(e -> {
             captureMetrics(afterMetrics);
             refreshBenchmarkTable();
-            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: Consolas;");
+            statusLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-size: 11px; -fx-font-family: 'Segoe UI';");
             statusLabel.setText("✓ After metrics captured.");
         });
         clearBtn.setOnAction(e -> {
@@ -2343,11 +2391,11 @@ public class GameSessionPrepApp extends Application {
         HBox hdr = new HBox();
         hdr.setStyle("-fx-background-color: " + BG_CARD2 + "; -fx-padding: 6 10;");
         Label c0 = new Label("Metric");
-        c0.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + PURPLE + "; -fx-min-width: 160px;");
+        c0.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-text-fill: " + PURPLE + "; -fx-min-width: 160px;");
         Label c1 = new Label("Before");
-        c1.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
+        c1.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
         Label c2 = new Label("After");
-        c2.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
+        c2.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
         hdr.getChildren().addAll(c0, c1, c2);
         benchmarkResultsBox.getChildren().add(hdr);
 
@@ -2358,11 +2406,11 @@ public class GameSessionPrepApp extends Application {
             rowBox.setStyle("-fx-padding: 5 10; " +
                 "-fx-border-color: transparent transparent #220044 transparent; -fx-border-width: 0 0 1 0;");
             Label k = new Label(key);
-            k.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + TEXT + "; -fx-min-width: 160px;");
+            k.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; -fx-text-fill: " + TEXT + "; -fx-min-width: 160px;");
             Label b = new Label(before);
-            b.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
+            b.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; -fx-text-fill: " + AMBER + "; -fx-min-width: 160px;");
             Label a = new Label(after);
-            a.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
+            a.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; -fx-text-fill: " + GREEN + "; -fx-min-width: 160px;");
             rowBox.getChildren().addAll(k, b, a);
             benchmarkResultsBox.getChildren().add(rowBox);
         }
@@ -2375,7 +2423,7 @@ public class GameSessionPrepApp extends Application {
         root.setStyle("-fx-background-color: " + BG + ";");
 
         Label header = new Label("▌ LIVE NETWORK LATENCY MONITOR");
-        header.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 13px; " +
+        header.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 13px; " +
                         "-fx-text-fill: " + CYAN + ";");
 
         NumberAxis xAxis = new NumberAxis(0, 60, 10);
@@ -2418,10 +2466,10 @@ public class GameSessionPrepApp extends Application {
         int row = 0;
         for (String name : PING_SERVERS.keySet()) {
             Label nameL = new Label(name);
-            nameL.setStyle("-fx-font-family: Consolas; -fx-font-size: 12px; " +
+            nameL.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; " +
                            "-fx-text-fill: " + TEXT_DIM + "; -fx-min-width: 140px;");
             Label val = new Label("-- ms");
-            val.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+            val.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
                          "-fx-font-size: 13px; -fx-text-fill: " + GREEN + ";");
             pingLabelMap.put(name, val);
             grid.add(nameL, 0, row);
@@ -2479,7 +2527,7 @@ public class GameSessionPrepApp extends Application {
                         if (lbl != null) {
                             lbl.setText(ms < 0 ? "timeout" : ms + " ms");
                             String col = ms < 0 ? RED : ms < 60 ? GREEN : ms < 120 ? AMBER : RED;
-                            lbl.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; " +
+                            lbl.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
                                          "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
                         }
                         if (tick > 55) xAxis.setUpperBound(tick + 5);
