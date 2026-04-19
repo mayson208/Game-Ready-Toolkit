@@ -95,7 +95,9 @@ public class GameSessionPrepApp extends Application {
     private Button reportBtn;
     private List<PrepActionResult> lastResults = new ArrayList<>();
     private final Map<String, XYChart.Series<Number, Number>> pingSeriesMap = new LinkedHashMap<>();
-    private final Map<String, Label> pingLabelMap = new LinkedHashMap<>();
+    private final Map<String, Label> pingLabelMap   = new LinkedHashMap<>();
+    private final Map<String, Label> lossLabelMap   = new LinkedHashMap<>();
+    private final Map<String, Label> jitterLabelMap = new LinkedHashMap<>();
     private int    pingTick = 0;
     private Thread pingMonitorThread;
     private VBox   benchmarkResultsBox;
@@ -103,6 +105,7 @@ public class GameSessionPrepApp extends Application {
     private final Map<String, String> afterMetrics    = new LinkedHashMap<>();
     private final List<PrepAction> customActions = new ArrayList<>();
     private VBox   customActionListBox;
+    private Path   lastBackupPath;
 
     // ── Game profiles ─────────────────────────────────────────────────────────
     private static final Map<String, String> GAME_PROFILES = new LinkedHashMap<>();
@@ -322,7 +325,7 @@ public class GameSessionPrepApp extends Application {
         infoRow.setMaxWidth(Double.MAX_VALUE);
         infoRow.setPadding(new Insets(0, 0, 8, 0));
 
-        VBox topBar = new VBox(0, mainRow, infoRow, buildMarqueeStrip());
+        VBox topBar = new VBox(0, mainRow, infoRow);
         topBar.setStyle(
             "-fx-background-color: " + BG_CARD + "; " +
             "-fx-border-color: " + BORDER + "; -fx-border-width: 0 0 2 0;");
@@ -688,6 +691,9 @@ public class GameSessionPrepApp extends Application {
         Task<List<PrepActionResult>> task = new Task<>() {
             @Override
             protected List<PrepActionResult> call() {
+                if (!restoreMode) {
+                    lastBackupPath = takeRegistrySnapshot();
+                }
                 List<PrepActionResult> results = new ArrayList<>();
                 for (int i = 0; i < selected.size(); i++) {
                     PrepAction action = selected.get(i);
@@ -745,6 +751,39 @@ public class GameSessionPrepApp extends Application {
         Thread t = new Thread(task, "prep-runner");
         t.setDaemon(true);
         t.start();
+    }
+
+    // ── Registry snapshot ─────────────────────────────────────────────────────
+    private Path takeRegistrySnapshot() {
+        try {
+            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path backupDir = Paths.get(System.getProperty("user.home"), "GameReadyToolkit", "registry_backups", ts);
+            Files.createDirectories(backupDir);
+
+            // Export common Run keys that our tweaks touch
+            String[][] exports = {
+                { "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile",
+                  "SystemProfile.reg" },
+                { "HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters",
+                  "LanmanWorkstation.reg" },
+                { "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games",
+                  "GpuPriority.reg" },
+                { "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                  "UserStartup.reg" }
+            };
+
+            for (String[] pair : exports) {
+                Path outFile = backupDir.resolve(pair[1]);
+                ProcessBuilder pb = new ProcessBuilder(
+                    "reg", "export", pair[0], outFile.toString(), "/y");
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                p.waitFor(10, TimeUnit.SECONDS);
+            }
+            return backupDir;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Result dialog ─────────────────────────────────────────────────────────
@@ -816,7 +855,16 @@ public class GameSessionPrepApp extends Application {
             }
         });
 
-        HBox btnRow = new HBox(10, logBtn, new Region(), closeBtn);
+        Button backupBtn = new Button("Open Backup");
+        backupBtn.setStyle(smallBtnStyle(TEXT_DIM));
+        backupBtn.setDisable(lastBackupPath == null || !Files.exists(lastBackupPath));
+        backupBtn.setOnAction(e -> {
+            if (lastBackupPath != null && Desktop.isDesktopSupported()) {
+                try { Desktop.getDesktop().open(lastBackupPath.toFile()); } catch (IOException ex) {}
+            }
+        });
+
+        HBox btnRow = new HBox(10, logBtn, backupBtn, new Region(), closeBtn);
         HBox.setHgrow(btnRow.getChildren().get(1), Priority.ALWAYS);
         btnRow.setAlignment(Pos.CENTER);
         btnRow.setPadding(new Insets(12, 20, 20, 20));
@@ -2459,21 +2507,40 @@ public class GameSessionPrepApp extends Application {
         }
         chart.getStylesheets().add("data:text/css," + chartCss);
 
-        // Live ping labels grid
+        // Live ping labels grid — 4 columns: Server | RTT | Loss | Jitter
         javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
         grid.setHgap(20); grid.setVgap(6);
         grid.setPadding(new Insets(8));
-        int row = 0;
+
+        String hdrStyle = "-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; -fx-font-size: 11px; " +
+                          "-fx-text-fill: " + TEXT_DIM + ";";
+        Label hServer = new Label("SERVER"); hServer.setStyle(hdrStyle + " -fx-min-width: 140px;");
+        Label hRtt    = new Label("RTT");    hRtt.setStyle(hdrStyle + " -fx-min-width: 80px;");
+        Label hLoss   = new Label("LOSS");   hLoss.setStyle(hdrStyle + " -fx-min-width: 70px;");
+        Label hJitter = new Label("JITTER"); hJitter.setStyle(hdrStyle + " -fx-min-width: 80px;");
+        grid.add(hServer, 0, 0); grid.add(hRtt, 1, 0); grid.add(hLoss, 2, 0); grid.add(hJitter, 3, 0);
+
+        int row = 1;
         for (String name : PING_SERVERS.keySet()) {
             Label nameL = new Label(name);
             nameL.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 12px; " +
                            "-fx-text-fill: " + TEXT_DIM + "; -fx-min-width: 140px;");
-            Label val = new Label("-- ms");
-            val.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
-                         "-fx-font-size: 13px; -fx-text-fill: " + GREEN + ";");
-            pingLabelMap.put(name, val);
-            grid.add(nameL, 0, row);
-            grid.add(val,   1, row);
+            Label rttL = new Label("-- ms");
+            rttL.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                          "-fx-font-size: 13px; -fx-text-fill: " + GREEN + "; -fx-min-width: 80px;");
+            Label lossL = new Label("--%");
+            lossL.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                           "-fx-font-size: 13px; -fx-text-fill: " + TEXT_DIM + "; -fx-min-width: 70px;");
+            Label jitterL = new Label("-- ms");
+            jitterL.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                             "-fx-font-size: 13px; -fx-text-fill: " + TEXT_DIM + "; -fx-min-width: 80px;");
+            pingLabelMap.put(name,   rttL);
+            lossLabelMap.put(name,   lossL);
+            jitterLabelMap.put(name, jitterL);
+            grid.add(nameL,   0, row);
+            grid.add(rttL,    1, row);
+            grid.add(lossL,   2, row);
+            grid.add(jitterL, 3, row);
             row++;
         }
 
@@ -2513,25 +2580,50 @@ public class GameSessionPrepApp extends Application {
         pingMonitorThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 int tick = pingTick++;
+                // Spawn one thread per server so all pings run in parallel
+                List<Thread> round = new ArrayList<>();
                 for (Map.Entry<String, String> entry : PING_SERVERS.entrySet()) {
                     String name = entry.getKey();
                     String host = entry.getValue();
-                    long ms = pingHost(host);
-                    Platform.runLater(() -> {
-                        XYChart.Series<Number, Number> series = pingSeriesMap.get(name);
-                        if (series != null) {
-                            series.getData().add(new XYChart.Data<>(tick, ms < 0 ? 0 : ms));
-                            if (series.getData().size() > 60) series.getData().remove(0);
-                        }
-                        Label lbl = pingLabelMap.get(name);
-                        if (lbl != null) {
-                            lbl.setText(ms < 0 ? "timeout" : ms + " ms");
-                            String col = ms < 0 ? RED : ms < 60 ? GREEN : ms < 120 ? AMBER : RED;
-                            lbl.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
-                                         "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
-                        }
-                        if (tick > 55) xAxis.setUpperBound(tick + 5);
-                    });
+                    Thread t = new Thread(() -> {
+                        PingResult pr = pingHost(host);
+                        Platform.runLater(() -> {
+                            XYChart.Series<Number, Number> series = pingSeriesMap.get(name);
+                            if (series != null) {
+                                series.getData().add(new XYChart.Data<>(tick, pr.avgMs() < 0 ? 0 : pr.avgMs()));
+                                if (series.getData().size() > 60) series.getData().remove(0);
+                            }
+                            Label rtt = pingLabelMap.get(name);
+                            if (rtt != null) {
+                                rtt.setText(pr.avgMs() < 0 ? "timeout" : pr.avgMs() + " ms");
+                                String col = pr.avgMs() < 0 ? RED : pr.avgMs() < 60 ? GREEN : pr.avgMs() < 120 ? AMBER : RED;
+                                rtt.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                                             "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
+                            }
+                            Label loss = lossLabelMap.get(name);
+                            if (loss != null) {
+                                loss.setText(pr.lossPercent() + "%");
+                                String col = pr.lossPercent() == 0 ? GREEN : pr.lossPercent() < 20 ? AMBER : RED;
+                                loss.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                                              "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
+                            }
+                            Label jitter = jitterLabelMap.get(name);
+                            if (jitter != null) {
+                                jitter.setText(pr.jitterMs() < 0 ? "--" : pr.jitterMs() + " ms");
+                                String col = pr.jitterMs() < 0 ? TEXT_DIM : pr.jitterMs() < 15 ? GREEN : pr.jitterMs() < 40 ? AMBER : RED;
+                                jitter.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-weight: bold; " +
+                                                "-fx-font-size: 13px; -fx-text-fill: " + col + ";");
+                            }
+                            if (tick > 55) xAxis.setUpperBound(tick + 5);
+                        });
+                    }, "ping-" + name);
+                    t.setDaemon(true);
+                    t.start();
+                    round.add(t);
+                }
+                // Wait for all parallel pings to finish before next round
+                for (Thread t : round) {
+                    try { t.join(12000); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); return; }
                 }
                 try { Thread.sleep(2000); }
                 catch (InterruptedException ex) { Thread.currentThread().interrupt(); break; }
@@ -2541,18 +2633,35 @@ public class GameSessionPrepApp extends Application {
         pingMonitorThread.start();
     }
 
-    private long pingHost(String host) {
+    private record PingResult(long avgMs, int lossPercent, long jitterMs) {
+        static PingResult timeout() { return new PingResult(-1, 100, -1); }
+    }
+
+    private PingResult pingHost(String host) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("ping", "-n", "1", "-w", "1000", host);
+            ProcessBuilder pb = new ProcessBuilder("ping", "-n", "4", "-w", "1000", host);
             pb.redirectErrorStream(true);
             Process p = pb.start();
             String out = new String(p.getInputStream().readAllBytes());
-            boolean ok = p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0;
-            if (!ok) return -1;
+            if (!p.waitFor(10, TimeUnit.SECONDS)) return PingResult.timeout();
+
+            // Parse all RTT values
             Matcher m = Pattern.compile("time[=<](\\d+)ms").matcher(out);
-            if (m.find()) return Long.parseLong(m.group(1));
-            return -1;
-        } catch (Exception e) { return -1; }
+            List<Long> rtts = new ArrayList<>();
+            while (m.find()) rtts.add(Long.parseLong(m.group(1)));
+
+            // Parse loss %
+            int loss = 100;
+            Matcher lm = Pattern.compile("(\\d+)%\\s+loss").matcher(out);
+            if (lm.find()) loss = Integer.parseInt(lm.group(1));
+
+            if (rtts.isEmpty()) return PingResult.timeout();
+
+            long avg    = (long) rtts.stream().mapToLong(Long::longValue).average().orElse(-1);
+            long jitter = rtts.stream().mapToLong(Long::longValue).max().orElse(0)
+                        - rtts.stream().mapToLong(Long::longValue).min().orElse(0);
+            return new PingResult(avg, loss, jitter);
+        } catch (Exception e) { return PingResult.timeout(); }
     }
 
     // ── Auto-update check ─────────────────────────────────────────────────────
